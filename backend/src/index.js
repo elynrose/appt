@@ -185,18 +185,19 @@ fastify.all('/voice', async (request, reply) => {
     console.log(`[Voice Webhook] Content-Type:`, request.headers['content-type']);
     
     // Twilio sends form-encoded data in the body
-    // Try multiple ways to access it (form body parser might use different keys)
-    const callSid = request.body?.CallSid || request.body?.callSid || request.query?.CallSid || '';
-    const toNumber = request.body?.To || request.body?.to || request.query?.To || '';
+    // The form body parser should have parsed it into request.body
+    // Access the fields directly from the parsed body
+    const callSid = request.body?.CallSid || request.body?.CallSid || request.query?.CallSid || '';
+    const toNumber = request.body?.To || request.body?.To || request.query?.To || '';
+    const fromNumber = request.body?.From || request.body?.From || '';
     let businessId = request.query?.businessId || request.body?.businessId;
     let plan = 'premium';
     
-    console.log(`[Voice Webhook] Parsed - CallSid: ${callSid}, To: ${toNumber}, businessId param: ${businessId}`);
+    console.log(`[Voice Webhook] Parsed - CallSid: ${callSid}, To: ${toNumber}, From: ${fromNumber}, businessId param: ${businessId}`);
     
-    // If CallSid is still empty, try to read raw body
-    if (!callSid && request.raw) {
-      console.log(`[Voice Webhook] CallSid empty, checking raw body...`);
-      // Note: We can't easily read raw body after formbody parser, but we can log what we have
+    // Debug: Log body keys to see what's available
+    if (request.body && typeof request.body === 'object') {
+      console.log(`[Voice Webhook] Body keys:`, Object.keys(request.body));
     }
     
     if (!businessId) {
@@ -218,11 +219,11 @@ fastify.all('/voice', async (request, reply) => {
     // Get the public URL from environment or use the request host
     // For ngrok, use the public URL; for local dev, use request host
     const publicUrl = process.env.PUBLIC_URL || `https://${request.headers.host}`;
-    const streamUrl = `${publicUrl.replace('https://', 'wss://').replace('http://', 'ws://')}/twilio-media?businessId=${businessId}&callSid=${callSid}&plan=${plan}&to=${encodeURIComponent(
-      toNumber,
+    const streamUrl = `${publicUrl.replace('https://', 'wss://').replace('http://', 'ws://')}/twilio-media?businessId=${businessId}&callSid=${finalCallSid}&plan=${plan}&to=${encodeURIComponent(
+      finalToNumber,
     )}`;
     
-    console.log(`[Voice Webhook] Call ${callSid} from ${toNumber}, business: ${businessId}, plan: ${plan}`);
+    console.log(`[Voice Webhook] Call ${finalCallSid} from ${fromNumber} to ${finalToNumber}, business: ${businessId}, plan: ${plan}`);
     console.log(`[Voice Webhook] Stream URL: ${streamUrl}`);
     
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n  <Say>${greeting}</Say>\n  <Connect>\n    <Stream url="${streamUrl}" />\n  </Connect>\n</Response>`;
