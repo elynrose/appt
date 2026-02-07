@@ -403,13 +403,13 @@ export default fastify;
 
 // Start the server (only if not in test mode)
 if (process.env.NODE_ENV !== 'test' && import.meta.url === `file://${process.argv[1]}`) {
-  // Fastify should listen on 5050 (internal), Nginx will listen on Railway's PORT
-  const PORT = 5050;
+  // Listen on PORT env var (set by Render/Railway) or default to 5050
+  const PORT = process.env.PORT || 5050;
   fastify.listen({ port: PORT, host: '0.0.0.0' }, (err) => {
     if (err) {
       console.error(err);
       process.exit(1);
     }
-    console.log(`Backend listening on ${PORT} (Nginx proxies from Railway PORT)`);
+    console.log(`Backend listening on ${PORT}`);
   });
 }
