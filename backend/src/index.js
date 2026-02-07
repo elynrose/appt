@@ -178,12 +178,19 @@ fastify.register(fastifyWs, {
  */
 fastify.all('/voice', async (request, reply) => {
   try {
-    const callSid = request.body?.CallSid || request.query?.CallSid || '';
-    const toNumber = request.body?.To || request.query?.To || '';
-    let businessId = request.query?.businessId;
+    // Log raw request for debugging
+    console.log(`[Voice Webhook] Raw request - Method: ${request.method}, URL: ${request.url}`);
+    console.log(`[Voice Webhook] Raw body:`, JSON.stringify(request.body));
+    console.log(`[Voice Webhook] Raw query:`, JSON.stringify(request.query));
+    console.log(`[Voice Webhook] Headers:`, JSON.stringify(request.headers, null, 2));
+    
+    // Twilio sends form-encoded data, parse it
+    const callSid = request.body?.CallSid || request.query?.CallSid || request.body?.callSid || '';
+    const toNumber = request.body?.To || request.query?.To || request.body?.to || '';
+    let businessId = request.query?.businessId || request.body?.businessId;
     let plan = 'premium';
     
-    console.log(`[Voice Webhook] Incoming call - CallSid: ${callSid}, To: ${toNumber}, businessId param: ${businessId}`);
+    console.log(`[Voice Webhook] Parsed - CallSid: ${callSid}, To: ${toNumber}, businessId param: ${businessId}`);
     
     if (!businessId) {
       plan = 'basic';
