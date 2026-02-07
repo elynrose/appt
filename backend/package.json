@@ -7,7 +7,9 @@
     "start": "node src/index.js",
     "start:with-nginx": "nginx -c /app/nginx.conf && node src/index.js",
     "test": "node --test",
-    "test:watch": "node --test --watch"
+    "test:watch": "node --test --watch",
+    "test:call": "./test-call.sh",
+    "test:websocket": "node test-websocket.js"
   },
   "dependencies": {
     "@fastify/cors": "^11.2.0",
