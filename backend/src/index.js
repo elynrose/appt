@@ -236,7 +236,18 @@ fastify.all('/voice', async (request, reply) => {
     console.log(`[Voice Webhook] Request host: ${request.headers.host}`);
     console.log(`[Voice Webhook] Stream URL: ${streamUrl}`);
     
-    const twiml = `<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n  <Say>${greeting}</Say>\n  <Connect>\n    <Stream url="${streamUrl}" />\n  </Connect>\n</Response>`;
+    const xmlEscape = (value) =>
+      String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&apos;');
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n  <Say>${xmlEscape(
+      greeting,
+    )}</Say>\n  <Connect>\n    <Stream url="${xmlEscape(
+      streamUrl,
+    )}" />\n  </Connect>\n</Response>`;
     reply.type('text/xml').send(twiml);
   } catch (err) {
     console.error('[Voice Webhook] Error processing webhook:', err);
