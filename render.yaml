@@ -1,0 +1,42 @@
+# Render Blueprint for easy deployment
+# Deploy both services with: render blueprint launch
+
+services:
+  # Backend Service
+  - type: web
+    name: agentic-appointment-backend
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm install
+    startCommand: npm run start
+    rootDir: backend
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5050
+      # Add these in Render dashboard after deployment:
+      # OPENAI_API_KEY
+      # FIREBASE_SERVICE_ACCOUNT_BASE64
+      # PUBLIC_URL (set after getting URL)
+
+  # Frontend Service
+  - type: web
+    name: agentic-appointment-frontend
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    rootDir: frontend
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Add these in Render dashboard after deployment:
+      # VITE_FIREBASE_API_KEY
+      # VITE_FIREBASE_AUTH_DOMAIN
+      # VITE_FIREBASE_PROJECT_ID
+      # VITE_FIREBASE_APP_ID
+      # VITE_BACKEND_URL (set after backend deploys)
+
