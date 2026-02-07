@@ -16,7 +16,7 @@ const envExamplePath = join(__dirname, '.env.example');
 
 // Firebase web app configuration from Firebase CLI
 const firebaseConfig = {
-  apiKey: 'AIzaSyAfX20OsEdxSyJrIApZp_IU4yERf5moOic',
+  apiKey: 'YOUR_FIREBASE_API_KEY',
   authDomain: 'studio-5771582587-5ae19.firebaseapp.com',
   projectId: 'studio-5771582587-5ae19',
   appId: '1:767449505901:web:a81ed5939980ebb673df64',

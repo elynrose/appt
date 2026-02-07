@@ -19,7 +19,7 @@ This means the Firebase API key is not set in Railway, or the frontend wasn't re
 
 | Variable Name | Value |
 |--------------|-------|
-| `VITE_FIREBASE_API_KEY` | `AIzaSyAfX20OsEdxSyJrIApZp_IU4yERf5moOic` |
+| `VITE_FIREBASE_API_KEY` | `your_firebase_api_key` |
 | `VITE_FIREBASE_AUTH_DOMAIN` | `studio-5771582587-5ae19.firebaseapp.com` |
 | `VITE_FIREBASE_PROJECT_ID` | `studio-5771582587-5ae19` |
 | `VITE_FIREBASE_APP_ID` | `1:767449505901:web:a81ed5939980ebb673df64` |
@@ -81,7 +81,7 @@ If you:
 Make sure ALL of these are set in Railway frontend service:
 
 ```
-VITE_FIREBASE_API_KEY=AIzaSyAfX20OsEdxSyJrIApZp_IU4yERf5moOic
+VITE_FIREBASE_API_KEY=your_firebase_api_key
 VITE_FIREBASE_AUTH_DOMAIN=studio-5771582587-5ae19.firebaseapp.com
 VITE_FIREBASE_PROJECT_ID=studio-5771582587-5ae19
 VITE_FIREBASE_APP_ID=1:767449505901:web:a81ed5939980ebb673df64
