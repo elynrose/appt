@@ -375,12 +375,17 @@ fastify.post('/integrations/twilio/validate', async (request, reply) => {
   }
 });
 
-// Start the server
-const PORT = process.env.PORT || 5050;
-fastify.listen({ port: PORT, host: '0.0.0.0' }, (err) => {
-  if (err) {
-    console.error(err);
-    process.exit(1);
-  }
-  console.log(`Backend listening on ${PORT}`);
-});
+// Export the Fastify app for testing
+export default fastify;
+
+// Start the server (only if not in test mode)
+if (process.env.NODE_ENV !== 'test' && import.meta.url === `file://${process.argv[1]}`) {
+  const PORT = process.env.PORT || 5050;
+  fastify.listen({ port: PORT, host: '0.0.0.0' }, (err) => {
+    if (err) {
+      console.error(err);
+      process.exit(1);
+    }
+    console.log(`Backend listening on ${PORT}`);
+  });
+}
