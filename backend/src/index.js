@@ -260,7 +260,10 @@ fastify.all('/voice', async (request, reply) => {
     // Get the public URL from environment or use the request host
     // For ngrok, use the public URL; for local dev, use request host
     const publicUrl = process.env.PUBLIC_URL || `https://${request.headers.host}`;
-    const streamUrl = `${publicUrl.replace('https://', 'wss://').replace('http://', 'ws://')}/twilio-media?businessId=${businessId}&callSid=${finalCallSid}&plan=${plan}&to=${encodeURIComponent(
+    const streamPath = `/twilio-media/${encodeURIComponent(businessId)}/${encodeURIComponent(
+      finalCallSid,
+    )}`;
+    const streamUrl = `${publicUrl.replace('https://', 'wss://').replace('http://', 'ws://')}${streamPath}?plan=${plan}&to=${encodeURIComponent(
       finalToNumber,
     )}`;
     
@@ -296,9 +299,18 @@ fastify.all('/voice', async (request, reply) => {
  * TwilioRealtimeTransportLayer.
  */
 wss.on('connection', async (ws, req) => {
-  const { searchParams } = new URL(req.url, 'http://localhost');
-  const businessId = searchParams.get('businessId');
-  const callSid = searchParams.get('callSid');
+  const parsedUrl = new URL(req.url, 'http://localhost');
+  const { pathname, searchParams } = parsedUrl;
+  let businessId = searchParams.get('businessId');
+  let callSid = searchParams.get('callSid');
+
+  if (!businessId || !callSid) {
+    const match = pathname.match(/^\/twilio-media\/([^/]+)\/([^/]+)$/);
+    if (match) {
+      businessId = decodeURIComponent(match[1]);
+      callSid = decodeURIComponent(match[2]);
+    }
+  }
 
   console.log(`[WebSocket] 🔌 Connection attempt received`);
   console.log(`[WebSocket] Query params - businessId: ${businessId}, callSid: ${callSid}`);
