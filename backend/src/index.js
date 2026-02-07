@@ -187,9 +187,9 @@ fastify.all('/voice', async (request, reply) => {
     // Twilio sends form-encoded data in the body
     // The form body parser should have parsed it into request.body
     // Access the fields directly from the parsed body
-    const callSid = request.body?.CallSid || request.body?.CallSid || request.query?.CallSid || '';
-    const toNumber = request.body?.To || request.body?.To || request.query?.To || '';
-    const fromNumber = request.body?.From || request.body?.From || '';
+    const callSid = request.body?.CallSid || request.query?.CallSid || '';
+    const toNumber = request.body?.To || request.query?.To || '';
+    const fromNumber = request.body?.From || '';
     let businessId = request.query?.businessId || request.body?.businessId;
     let plan = 'premium';
     
@@ -202,16 +202,24 @@ fastify.all('/voice', async (request, reply) => {
     
     if (!businessId) {
       plan = 'basic';
-      businessId = await resolveBusinessId(toNumber);
-      console.log(`[Voice Webhook] Resolved businessId for basic plan: ${businessId}`);
+      if (toNumber) {
+        businessId = await resolveBusinessId(toNumber);
+        console.log(`[Voice Webhook] Resolved businessId for basic plan: ${businessId}`);
+      } else {
+        console.warn(`[Voice Webhook] No To number provided, cannot resolve businessId for basic plan`);
+      }
     }
     
     if (!businessId) {
-      console.error(`[Voice Webhook] No businessId found for number: ${toNumber}`);
+      console.error(`[Voice Webhook] No businessId found. To: ${toNumber}, Query businessId: ${request.query?.businessId}`);
       const failure = `<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n  <Say>Sorry, this number is not configured.</Say>\n</Response>`;
       reply.type('text/xml').send(failure);
       return;
     }
+    
+    // Ensure we have CallSid and To (should be in body from Twilio)
+    const finalCallSid = callSid || `CA${Date.now()}`;
+    const finalToNumber = toNumber || request.body?.Called || '';
     
     // Provide a simple greeting.  This could be customised per business.
     const greeting = 'Thank you for calling. Please wait while I connect you to our scheduling assistant.';
