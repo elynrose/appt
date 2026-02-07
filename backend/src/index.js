@@ -182,15 +182,22 @@ fastify.all('/voice', async (request, reply) => {
     console.log(`[Voice Webhook] Raw request - Method: ${request.method}, URL: ${request.url}`);
     console.log(`[Voice Webhook] Raw body:`, JSON.stringify(request.body));
     console.log(`[Voice Webhook] Raw query:`, JSON.stringify(request.query));
-    console.log(`[Voice Webhook] Headers:`, JSON.stringify(request.headers, null, 2));
+    console.log(`[Voice Webhook] Content-Type:`, request.headers['content-type']);
     
-    // Twilio sends form-encoded data, parse it
-    const callSid = request.body?.CallSid || request.query?.CallSid || request.body?.callSid || '';
-    const toNumber = request.body?.To || request.query?.To || request.body?.to || '';
+    // Twilio sends form-encoded data in the body
+    // Try multiple ways to access it (form body parser might use different keys)
+    const callSid = request.body?.CallSid || request.body?.callSid || request.query?.CallSid || '';
+    const toNumber = request.body?.To || request.body?.to || request.query?.To || '';
     let businessId = request.query?.businessId || request.body?.businessId;
     let plan = 'premium';
     
     console.log(`[Voice Webhook] Parsed - CallSid: ${callSid}, To: ${toNumber}, businessId param: ${businessId}`);
+    
+    // If CallSid is still empty, try to read raw body
+    if (!callSid && request.raw) {
+      console.log(`[Voice Webhook] CallSid empty, checking raw body...`);
+      // Note: We can't easily read raw body after formbody parser, but we can log what we have
+    }
     
     if (!businessId) {
       plan = 'basic';
