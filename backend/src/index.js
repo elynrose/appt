@@ -1,10 +1,12 @@
 import Fastify from 'fastify';
 import fastifyFormBody from '@fastify/formbody';
 import fastifyWs from '@fastify/websocket';
+import fastifyCors from '@fastify/cors';
 import { RealtimeAgent, RealtimeSession, tool } from '@openai/agents/realtime';
 import { TwilioRealtimeTransportLayer } from '@openai/agents-extensions';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
 import dotenv from 'dotenv';
 import z from 'zod';
 import { Buffer } from 'buffer';
@@ -42,6 +44,7 @@ if (adminCredential) {
   initializeApp({ credential: cert(adminCredential) });
 }
 const db = adminCredential ? getFirestore() : null;
+const adminAuth = adminCredential ? getAuth() : null;
 
 /**
  * Retrieve Twilio credentials for a premium business from environment variables.
@@ -144,6 +147,19 @@ function createAgent(businessId, callSid) {
 
 // Create and configure Fastify instance
 const fastify = Fastify();
+
+// Add request logging
+fastify.addHook('onRequest', async (request, reply) => {
+  if (request.url.includes('twilio-media')) {
+    console.log(`[Request] ${request.method} ${request.url}`);
+    console.log(`[Request] Headers:`, request.headers);
+  }
+});
+
+fastify.register(fastifyCors, {
+  origin: true, // Allow all origins in development
+  credentials: true,
+});
 fastify.register(fastifyFormBody);
 fastify.register(fastifyWs);
 
@@ -154,26 +170,47 @@ fastify.register(fastifyWs);
  * businessId by the called number for “basic” routing.
  */
 fastify.all('/voice', async (request, reply) => {
-  const callSid = request.body?.CallSid || request.query?.CallSid || '';
-  const toNumber = request.body?.To || request.query?.To || '';
-  let businessId = request.query?.businessId;
-  let plan = 'premium';
-  if (!businessId) {
-    plan = 'basic';
-    businessId = await resolveBusinessId(toNumber);
+  try {
+    const callSid = request.body?.CallSid || request.query?.CallSid || '';
+    const toNumber = request.body?.To || request.query?.To || '';
+    let businessId = request.query?.businessId;
+    let plan = 'premium';
+    
+    console.log(`[Voice Webhook] Incoming call - CallSid: ${callSid}, To: ${toNumber}, businessId param: ${businessId}`);
+    
+    if (!businessId) {
+      plan = 'basic';
+      businessId = await resolveBusinessId(toNumber);
+      console.log(`[Voice Webhook] Resolved businessId for basic plan: ${businessId}`);
+    }
+    
+    if (!businessId) {
+      console.error(`[Voice Webhook] No businessId found for number: ${toNumber}`);
+      const failure = `<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n  <Say>Sorry, this number is not configured.</Say>\n</Response>`;
+      reply.type('text/xml').send(failure);
+      return;
+    }
+    
+    // Provide a simple greeting.  This could be customised per business.
+    const greeting = 'Thank you for calling. Please wait while I connect you to our scheduling assistant.';
+    
+    // Get the public URL from environment or use the request host
+    // For ngrok, use the public URL; for local dev, use request host
+    const publicUrl = process.env.PUBLIC_URL || `https://${request.headers.host}`;
+    const streamUrl = `${publicUrl.replace('https://', 'wss://').replace('http://', 'ws://')}/twilio-media?businessId=${businessId}&callSid=${callSid}&plan=${plan}&to=${encodeURIComponent(
+      toNumber,
+    )}`;
+    
+    console.log(`[Voice Webhook] Call ${callSid} from ${toNumber}, business: ${businessId}, plan: ${plan}`);
+    console.log(`[Voice Webhook] Stream URL: ${streamUrl}`);
+    
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n  <Say>${greeting}</Say>\n  <Connect>\n    <Stream url="${streamUrl}" />\n  </Connect>\n</Response>`;
+    reply.type('text/xml').send(twiml);
+  } catch (err) {
+    console.error('[Voice Webhook] Error processing webhook:', err);
+    const errorTwiml = `<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n  <Say>We're sorry, an error occurred. Please try again later.</Say>\n</Response>`;
+    reply.type('text/xml').send(errorTwiml);
   }
-  if (!businessId) {
-    const failure = `<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n  <Say>Sorry, this number is not configured.</Say>\n</Response>`;
-    reply.type('text/xml').send(failure);
-    return;
-  }
-  // Provide a simple greeting.  This could be customised per business.
-  const greeting = 'Thank you for calling. Please wait while I connect you to our scheduling assistant.';
-  const streamUrl = `wss://${request.headers.host}/twilio-media?businessId=${businessId}&callSid=${callSid}&plan=${plan}&to=${encodeURIComponent(
-    toNumber,
-  )}`;
-  const twiml = `<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n  <Say>${greeting}</Say>\n  <Connect>\n    <Stream url="${streamUrl}" />\n  </Connect>\n</Response>`;
-  reply.type('text/xml').send(twiml);
 });
 
 /**
@@ -184,21 +221,123 @@ fastify.all('/voice', async (request, reply) => {
  */
 fastify.get('/twilio-media', { websocket: true }, async (connection, req) => {
   const { businessId, callSid } = req.query;
+  
+  console.log(`[WebSocket] 🔌 Connection attempt received`);
+  console.log(`[WebSocket] Query params - businessId: ${businessId}, callSid: ${callSid}`);
+  console.log(`[WebSocket] Full query:`, req.query);
+  console.log(`[WebSocket] Headers:`, req.headers);
+  
+  // Log connection events
+  connection.socket.on('open', () => {
+    console.log(`[WebSocket] ✅ Connection opened for call ${callSid}`);
+  });
+  
+  connection.socket.on('close', (code, reason) => {
+    console.log(`[WebSocket] ❌ Connection closed - code: ${code}, reason: ${reason}`);
+  });
+  
+  connection.socket.on('error', (err) => {
+    console.error(`[WebSocket] ❌ Socket error:`, err);
+  });
+  
   if (!businessId || !callSid) {
+    console.error(`[WebSocket] Missing required parameters - businessId: ${businessId}, callSid: ${callSid}`);
     connection.socket.close();
     return;
   }
+  
+  if (!process.env.OPENAI_API_KEY) {
+    console.error('[WebSocket] OPENAI_API_KEY is not set');
+    connection.socket.close();
+    return;
+  }
+  
   const agent = createAgent(businessId, callSid);
   try {
+    console.log(`[WebSocket] Creating transport and session for call ${callSid}`);
     const transport = new TwilioRealtimeTransportLayer({
       twilioWebSocket: connection.socket,
     });
     const session = new RealtimeSession(agent, { transport });
+    console.log(`[WebSocket] Connecting to OpenAI Realtime API...`);
     await session.connect({ apiKey: process.env.OPENAI_API_KEY });
-    console.log(`Realtime session started for call ${callSid} (business ${businessId}).`);
+    console.log(`[WebSocket] ✅ Realtime session started for call ${callSid} (business ${businessId}).`);
   } catch (err) {
-    console.error('Realtime session error', err);
+    console.error(`[WebSocket] ❌ Realtime session error for call ${callSid}:`, err);
+    console.error('Error details:', {
+      message: err.message,
+      stack: err.stack,
+      name: err.name,
+    });
     connection.socket.close();
+  }
+});
+
+/**
+ * Onboarding endpoint. Creates a business and sets the businessId custom claim for the user.
+ * Requires a valid Firebase ID token in the Authorization header.
+ */
+fastify.post('/onboarding', async (request, reply) => {
+  const authHeader = request.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    reply.code(401).send({ ok: false, error: 'Missing or invalid authorization header' });
+    return;
+  }
+
+  const idToken = authHeader.substring(7);
+  const { businessName, timezone, plan } = request.body || {};
+
+  if (!businessName || !timezone) {
+    reply.code(400).send({ ok: false, error: 'Missing required fields: businessName, timezone' });
+    return;
+  }
+
+  const selectedPlan = plan === 'premium' ? 'premium' : 'basic';
+
+  if (!adminAuth || !db) {
+    reply.code(500).send({ ok: false, error: 'Firebase Admin not initialized' });
+    return;
+  }
+
+  try {
+    // Verify the ID token
+    const decodedToken = await adminAuth.verifyIdToken(idToken);
+    const uid = decodedToken.uid;
+
+    // Check if user already has a businessId
+    if (decodedToken.businessId) {
+      reply.code(400).send({ ok: false, error: 'User already has a businessId' });
+      return;
+    }
+
+    // Generate a unique business ID
+    const businessId = `business-${uid.substring(0, 8)}-${Date.now().toString(36)}`;
+
+    // Create business document
+    const businessRef = db.collection('businesses').doc(businessId);
+    await businessRef.set({
+      name: businessName,
+      plan: selectedPlan,
+      timezone,
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    // Set custom claim
+    await adminAuth.setCustomUserClaims(uid, { businessId });
+
+    reply.send({
+      ok: true,
+      businessId,
+      message: 'Business created successfully. Please sign out and sign in again to refresh your token.',
+    });
+  } catch (err) {
+    console.error('Onboarding error:', err);
+    if (err.code === 'auth/argument-error') {
+      reply.code(401).send({ ok: false, error: 'Invalid ID token' });
+    } else {
+      reply.code(500).send({ ok: false, error: err.message || 'Failed to create business' });
+    }
   }
 });
 

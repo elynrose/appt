@@ -16,7 +16,7 @@ export default function Settings({ businessId, user }) {
   const [accountSid, setAccountSid] = useState('');
   const [authToken, setAuthToken] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [submitState, setSubmitState] = useState({ loading: false, message: null, error: null });
+  const [submitState, setSubmitState] = useState({ loading: false, message: null, error: null, validated: false });
 
   useEffect(() => {
     async function fetchBusiness() {
@@ -40,22 +40,23 @@ export default function Settings({ businessId, user }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitState({ loading: true, message: null, error: null });
+    setSubmitState({ loading: true, message: null, error: null, validated: false });
     try {
-      const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/integrations/twilio/validate`, {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5050';
+      const res = await fetch(`${backendUrl}/integrations/twilio/validate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ businessId, accountSid, authToken, phoneNumber }),
       });
       const data = await res.json();
       if (data.ok) {
-        setSubmitState({ loading: false, message: data.message, error: null });
+        setSubmitState({ loading: false, message: data.message, error: null, validated: true });
       } else {
-        setSubmitState({ loading: false, message: null, error: data.error || 'Unknown error' });
+        setSubmitState({ loading: false, message: null, error: data.error || 'Unknown error', validated: false });
       }
     } catch (err) {
       console.error(err);
-      setSubmitState({ loading: false, message: null, error: 'Request failed' });
+      setSubmitState({ loading: false, message: null, error: 'Request failed', validated: false });
     }
   };
 
@@ -79,25 +80,74 @@ export default function Settings({ businessId, user }) {
       {plan === 'premium' && (
         <div className="card">
           <h3>Twilio Integration</h3>
-          <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label htmlFor="accountSid">Account SID</label>
-              <input id="accountSid" value={accountSid} onChange={(e) => setAccountSid(e.target.value)} required />
+          {!submitState.validated ? (
+            <form onSubmit={handleSubmit}>
+              <p style={{ marginBottom: '1rem', color: '#666' }}>
+                Enter your Twilio credentials to validate them. After validation, you'll receive instructions to complete the setup.
+              </p>
+              <div className="form-group">
+                <label htmlFor="accountSid">Account SID</label>
+                <input id="accountSid" value={accountSid} onChange={(e) => setAccountSid(e.target.value)} placeholder="AC..." required />
+              </div>
+              <div className="form-group">
+                <label htmlFor="authToken">Auth Token</label>
+                <input id="authToken" type="password" value={authToken} onChange={(e) => setAuthToken(e.target.value)} required />
+              </div>
+              <div className="form-group">
+                <label htmlFor="phoneNumber">Phone Number (E.164)</label>
+                <input id="phoneNumber" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="+15551234567" required />
+              </div>
+              {submitState.error && <div style={{ color: 'red', marginBottom: '0.5rem', padding: '0.75rem', background: '#ffe6e6', borderRadius: '4px' }}>{submitState.error}</div>}
+              <button type="submit" className="button" disabled={submitState.loading}>
+                {submitState.loading ? 'Validating…' : 'Validate Credentials'}
+              </button>
+            </form>
+          ) : (
+            <div>
+              <div style={{ color: 'green', marginBottom: '1rem', padding: '0.75rem', background: '#e6f7e6', borderRadius: '4px' }}>
+                ✅ Credentials validated successfully!
+              </div>
+              <div style={{ background: '#f5f5f5', padding: '1rem', borderRadius: '4px', marginBottom: '1rem' }}>
+                <h4 style={{ marginTop: 0 }}>Next Steps:</h4>
+                <ol style={{ paddingLeft: '1.5rem' }}>
+                  <li style={{ marginBottom: '0.5rem' }}>
+                    <strong>Add credentials to backend .env file:</strong>
+                    <pre style={{ background: '#fff', padding: '0.5rem', borderRadius: '4px', marginTop: '0.5rem', fontSize: '0.9rem', overflow: 'auto' }}>
+{`TWILIO_BUSINESS_${businessId}={"accountSid":"${accountSid}","authToken":"${authToken}","phoneNumber":"${phoneNumber}"}`}
+                    </pre>
+                    <p style={{ fontSize: '0.9rem', color: '#666', marginTop: '0.5rem' }}>
+                      Or run: <code>cd backend && node add-twilio-credentials.js {businessId} {accountSid} {authToken} {phoneNumber}</code>
+                    </p>
+                  </li>
+                  <li style={{ marginBottom: '0.5rem' }}>
+                    <strong>Configure Twilio webhook:</strong>
+                    <ol style={{ paddingLeft: '1.5rem', marginTop: '0.5rem' }}>
+                      <li>Go to <a href="https://console.twilio.com/us1/develop/phone-numbers/manage/incoming" target="_blank" rel="noopener noreferrer">Twilio Console → Phone Numbers</a></li>
+                      <li>Click on your phone number: <strong>{phoneNumber}</strong></li>
+                      <li>Under "A CALL COMES IN", set webhook URL to:
+                        <pre style={{ background: '#fff', padding: '0.5rem', borderRadius: '4px', marginTop: '0.5rem', fontSize: '0.9rem' }}>
+{`https://your-ngrok-url.ngrok-free.dev/voice?businessId=${businessId}`}
+                        </pre>
+                      </li>
+                      <li>Set HTTP method to <strong>POST</strong></li>
+                      <li>Click <strong>Save</strong></li>
+                    </ol>
+                  </li>
+                  <li>
+                    <strong>Restart your backend server</strong> after adding credentials to .env
+                  </li>
+                </ol>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSubmitState({ loading: false, message: null, error: null, validated: false })}
+                className="button"
+                style={{ background: '#6c757d' }}
+              >
+                Start Over
+              </button>
             </div>
-            <div className="form-group">
-              <label htmlFor="authToken">Auth Token</label>
-              <input id="authToken" type="password" value={authToken} onChange={(e) => setAuthToken(e.target.value)} required />
-            </div>
-            <div className="form-group">
-              <label htmlFor="phoneNumber">Phone Number (E.164)</label>
-              <input id="phoneNumber" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="+15551234567" required />
-            </div>
-            {submitState.error && <div style={{ color: 'red', marginBottom: '0.5rem' }}>{submitState.error}</div>}
-            {submitState.message && <div style={{ color: 'green', marginBottom: '0.5rem' }}>{submitState.message}</div>}
-            <button type="submit" className="button" disabled={submitState.loading}>
-              {submitState.loading ? 'Validating…' : 'Validate'}
-            </button>
-          </form>
+          )}
         </div>
       )}
     </div>

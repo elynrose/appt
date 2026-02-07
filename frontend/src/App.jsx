@@ -3,6 +3,7 @@ import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase.js';
 import Login from './pages/Login.jsx';
+import Onboarding from './pages/Onboarding.jsx';
 import Calls from './pages/Calls.jsx';
 import Schedule from './pages/Schedule.jsx';
 import Services from './pages/Services.jsx';
@@ -25,7 +26,8 @@ export default function App() {
       if (currentUser) {
         setUser(currentUser);
         try {
-          const tokenResult = await currentUser.getIdTokenResult();
+          // Force refresh to get latest claims
+          const tokenResult = await currentUser.getIdTokenResult(true);
           setBusinessId(tokenResult.claims?.businessId || null);
         } catch (err) {
           console.error('Failed to fetch token claims', err);
@@ -40,12 +42,30 @@ export default function App() {
     return () => unsub();
   }, []);
 
+  const handleOnboardingComplete = async () => {
+    // Refresh the user's token to get the new businessId claim
+    if (user) {
+      try {
+        await user.getIdToken(true);
+        const tokenResult = await user.getIdTokenResult(true);
+        setBusinessId(tokenResult.claims?.businessId || null);
+      } catch (err) {
+        console.error('Failed to refresh token after onboarding', err);
+      }
+    }
+  };
+
   if (initialising) {
     return <div className="container">Loading…</div>;
   }
 
   if (!user) {
     return <Login />;
+  }
+
+  // Show onboarding if user is authenticated but doesn't have a businessId
+  if (user && !businessId) {
+    return <Onboarding onComplete={handleOnboardingComplete} />;
   }
 
   return (
