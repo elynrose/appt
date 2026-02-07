@@ -148,11 +148,14 @@ function createAgent(businessId, callSid) {
 // Create and configure Fastify instance
 const fastify = Fastify();
 
-// Add request logging
+// Add request logging for all requests to help diagnose WebSocket issues
 fastify.addHook('onRequest', async (request, reply) => {
   if (request.url.includes('twilio-media')) {
     console.log(`[Request] ${request.method} ${request.url}`);
-    console.log(`[Request] Headers:`, request.headers);
+    console.log(`[Request] Headers:`, JSON.stringify(request.headers, null, 2));
+    console.log(`[Request] Upgrade header:`, request.headers.upgrade);
+    console.log(`[Request] Connection header:`, request.headers.connection);
+    console.log(`[Request] Is WebSocket upgrade:`, request.headers.upgrade === 'websocket');
   }
 });
 
