@@ -1,12 +1,12 @@
 import Fastify from 'fastify';
 import fastifyFormBody from '@fastify/formbody';
-import fastifyWs from '@fastify/websocket';
 import fastifyCors from '@fastify/cors';
 import { RealtimeAgent, RealtimeSession, tool } from '@openai/agents/realtime';
 import { TwilioRealtimeTransportLayer } from '@openai/agents-extensions';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
+import { WebSocketServer } from 'ws';
 import dotenv from 'dotenv';
 import z from 'zod';
 import { Buffer } from 'buffer';
@@ -164,11 +164,6 @@ fastify.register(fastifyCors, {
   credentials: true,
 });
 fastify.register(fastifyFormBody);
-fastify.register(fastifyWs, {
-  options: {
-    maxPayload: 1048576, // 1MB
-  },
-});
 
 // Log route table at startup to confirm WebSocket route registration in production.
 fastify.ready()
@@ -189,6 +184,23 @@ fastify.setNotFoundHandler((request, reply) => {
     });
   }
   reply.code(404).send('Not Found');
+});
+
+// Dedicated WebSocket server for Twilio Media Streams to ensure a clean 101 upgrade.
+const wss = new WebSocketServer({ noServer: true, maxPayload: 1048576 });
+fastify.server.on('upgrade', (req, socket, head) => {
+  try {
+    const { pathname } = new URL(req.url, 'http://localhost');
+    if (pathname === '/twilio-media') {
+      wss.handleUpgrade(req, socket, head, (ws) => {
+        wss.emit('connection', ws, req);
+      });
+      return;
+    }
+  } catch (err) {
+    console.error('[Upgrade] Failed to parse upgrade URL', err);
+  }
+  socket.destroy();
 });
 
 /**
@@ -278,49 +290,45 @@ fastify.all('/voice', async (request, reply) => {
 });
 
 /**
- * WebSocket endpoint for Twilio Media Streams.  The query string must include
- * `businessId` and `callSid`.  When a connection is established, this handler
- * creates a RealtimeAgent for the given business and call, and then brokers
- * audio between Twilio and the OpenAI Realtime API using the TwilioRealtimeTransportLayer【671551374085659†L808-L865】.
+ * WebSocket endpoint for Twilio Media Streams. The query string must include
+ * `businessId` and `callSid`. We handle the HTTP upgrade directly to avoid
+ * proxy-related handshake issues and then pass the ws instance to the
+ * TwilioRealtimeTransportLayer.
  */
-fastify.get('/twilio-media', { websocket: true }, async (connection, req) => {
-  const { businessId, callSid } = req.query;
-  
+wss.on('connection', async (ws, req) => {
+  const { searchParams } = new URL(req.url, 'http://localhost');
+  const businessId = searchParams.get('businessId');
+  const callSid = searchParams.get('callSid');
+
   console.log(`[WebSocket] 🔌 Connection attempt received`);
   console.log(`[WebSocket] Query params - businessId: ${businessId}, callSid: ${callSid}`);
-  console.log(`[WebSocket] Full query:`, req.query);
   console.log(`[WebSocket] Headers:`, req.headers);
-  
-  // Log connection events
-  connection.socket.on('open', () => {
-    console.log(`[WebSocket] ✅ Connection opened for call ${callSid}`);
-  });
-  
-  connection.socket.on('close', (code, reason) => {
+
+  ws.on('close', (code, reason) => {
     console.log(`[WebSocket] ❌ Connection closed - code: ${code}, reason: ${reason}`);
   });
-  
-  connection.socket.on('error', (err) => {
+
+  ws.on('error', (err) => {
     console.error(`[WebSocket] ❌ Socket error:`, err);
   });
-  
+
   if (!businessId || !callSid) {
     console.error(`[WebSocket] Missing required parameters - businessId: ${businessId}, callSid: ${callSid}`);
-    connection.socket.close();
+    ws.close();
     return;
   }
-  
+
   if (!process.env.OPENAI_API_KEY) {
     console.error('[WebSocket] OPENAI_API_KEY is not set');
-    connection.socket.close();
+    ws.close();
     return;
   }
-  
+
   const agent = createAgent(businessId, callSid);
   try {
     console.log(`[WebSocket] Creating transport and session for call ${callSid}`);
     const transport = new TwilioRealtimeTransportLayer({
-      twilioWebSocket: connection.socket,
+      twilioWebSocket: ws,
     });
     const session = new RealtimeSession(agent, { transport });
     console.log(`[WebSocket] Connecting to OpenAI Realtime API...`);
@@ -333,7 +341,7 @@ fastify.get('/twilio-media', { websocket: true }, async (connection, req) => {
       stack: err.stack,
       name: err.name,
     });
-    connection.socket.close();
+    ws.close();
   }
 });
 
