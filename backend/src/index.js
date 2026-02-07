@@ -188,20 +188,6 @@ fastify.setNotFoundHandler((request, reply) => {
 
 // Dedicated WebSocket server for Twilio Media Streams to ensure a clean 101 upgrade.
 const wss = new WebSocketServer({ noServer: true, maxPayload: 1048576 });
-fastify.server.on('upgrade', (req, socket, head) => {
-  try {
-    const { pathname } = new URL(req.url, 'http://localhost');
-    if (pathname === '/twilio-media') {
-      wss.handleUpgrade(req, socket, head, (ws) => {
-        wss.emit('connection', ws, req);
-      });
-      return;
-    }
-  } catch (err) {
-    console.error('[Upgrade] Failed to parse upgrade URL', err);
-  }
-  socket.destroy();
-});
 
 /**
  * Twilio Voice webhook.  Responds with TwiML instructing Twilio to connect
@@ -465,13 +451,28 @@ fastify.listen({ port: PORT, host: '0.0.0.0' }, (err, address) => {
     process.exit(1);
   }
 
-  // Low-level upgrade visibility for debugging WebSocket handshake issues.
   if (fastify.server) {
+    // Low-level upgrade visibility for debugging WebSocket handshake issues.
     fastify.server.on('upgrade', (req, socket, head) => {
       console.log('[Upgrade] Incoming upgrade request', {
         url: req.url,
         headers: req.headers,
       });
+
+      try {
+        const { pathname } = new URL(req.url, 'http://localhost');
+        if (pathname.startsWith('/twilio-media/')) {
+          wss.handleUpgrade(req, socket, head, (ws) => {
+            console.log('[Upgrade] WebSocket upgrade accepted');
+            wss.emit('connection', ws, req);
+          });
+          return;
+        }
+      } catch (err) {
+        console.error('[Upgrade] Failed to parse upgrade URL', err);
+      }
+
+      socket.destroy();
     });
   }
 
