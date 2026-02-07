@@ -19,9 +19,13 @@ The data model uses the following Firestore collections:
 
 For a more detailed explanation of the multi‑tenant routing strategy, premium vs. basic plans and Twilio configuration flows see the conversation notes.  This repository includes the skeleton code for these flows; further enhancements such as pagination, caching and comprehensive error handling can be added as needed.
 
+## Deployment
+
+For detailed instructions on deploying both services to Railway, see [RAILWAY_DEPLOYMENT_SUCCESS.md](./RAILWAY_DEPLOYMENT_SUCCESS.md).
+
 ## Running the Backend
 
-1. Install dependencies (requires Node.js 22+):
+1. Install dependencies (requires Node.js 20+):
 
 ```sh
 cd backend
@@ -42,7 +46,9 @@ TWILIO_BUSINESS_abc123={"accountSid":"AC...","authToken":"...","phoneNumber":"+1
 npm run dev
 ```
 
-4. Expose your server publicly (e.g. with ngrok) and configure your Twilio phone number’s Voice webhook to point at `/voice`.  For premium businesses, pass the `businessId` as a query parameter, for example: `https://your.ngrok.io/voice?businessId=abc123`.  For basic businesses, simply use `https://your.ngrok.io/voice` and ensure the number is mapped in `/phoneRoutes`.
+4. Expose your server publicly (e.g. with ngrok for local development, or deploy to Railway for production) and configure your Twilio phone number's Voice webhook to point at `/voice`.  For premium businesses, pass the `businessId` as a query parameter, for example: `https://your.ngrok.io/voice?businessId=abc123`.  For basic businesses, simply use `https://your.ngrok.io/voice` and ensure the number is mapped in `/phoneRoutes`.
+
+   **Note:** For production deployment, Railway is recommended as it provides stable URLs and excellent WebSocket support. See [RAILWAY_DEPLOYMENT_SUCCESS.md](./RAILWAY_DEPLOYMENT_SUCCESS.md) for deployment instructions.
 
 ## Running the Frontend
 
