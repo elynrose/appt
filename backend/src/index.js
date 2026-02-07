@@ -161,7 +161,11 @@ fastify.register(fastifyCors, {
   credentials: true,
 });
 fastify.register(fastifyFormBody);
-fastify.register(fastifyWs);
+fastify.register(fastifyWs, {
+  options: {
+    maxPayload: 1048576, // 1MB
+  },
+});
 
 /**
  * Twilio Voice webhook.  Responds with TwiML instructing Twilio to connect
