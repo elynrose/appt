@@ -1,0 +1,11 @@
+{
+  "enabled": true,
+  "adapters": [
+    "telegram"
+  ],
+  "telegram": {
+    "token": "",
+    "chatId": "",
+    "polling": true
+  }
+}

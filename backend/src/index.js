@@ -232,6 +232,8 @@ fastify.all('/voice', async (request, reply) => {
     )}`;
     
     console.log(`[Voice Webhook] Call ${finalCallSid} from ${fromNumber} to ${finalToNumber}, business: ${businessId}, plan: ${plan}`);
+    console.log(`[Voice Webhook] PUBLIC_URL env: ${process.env.PUBLIC_URL || 'NOT SET'}`);
+    console.log(`[Voice Webhook] Request host: ${request.headers.host}`);
     console.log(`[Voice Webhook] Stream URL: ${streamUrl}`);
     
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n  <Say>${greeting}</Say>\n  <Connect>\n    <Stream url="${streamUrl}" />\n  </Connect>\n</Response>`;
