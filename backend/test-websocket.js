@@ -6,6 +6,10 @@
  */
 
 import { WebSocket } from 'ws';
+import https from 'https';
+
+// Allow self-signed certificates for testing
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 const url = process.argv[2] || 'wss://awake-cat-production-15ef.up.railway.app/twilio-media?businessId=business-1&callSid=test123&plan=premium&to=%2B15551234567';
 

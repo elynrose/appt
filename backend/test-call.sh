@@ -16,7 +16,7 @@ echo ""
 
 # Test webhook endpoint
 echo "📞 Testing /voice endpoint..."
-RESPONSE=$(curl -s -X POST "$PUBLIC_URL/voice?businessId=$BUSINESS_ID" \
+RESPONSE=$(curl -k -s -X POST "$PUBLIC_URL/voice?businessId=$BUSINESS_ID" \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "CallSid=test123&To=$(echo $PHONE_NUMBER | sed 's/+/%2B/')")
 
