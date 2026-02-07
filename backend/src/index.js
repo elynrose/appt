@@ -417,12 +417,23 @@ export default fastify;
 // Start the server (only if not in test mode)
 if (process.env.NODE_ENV !== 'test' && import.meta.url === `file://${process.argv[1]}`) {
   // Listen on PORT env var (set by Render/Railway) or default to 5050
-  const PORT = process.env.PORT || 5050;
-  fastify.listen({ port: PORT, host: '0.0.0.0' }, (err) => {
-    if (err) {
-      console.error(err);
-      process.exit(1);
-    }
-    console.log(`Backend listening on ${PORT}`);
-  });
+const PORT = process.env.PORT || 5050;
+fastify.listen({ port: PORT, host: '0.0.0.0' }, (err, address) => {
+  if (err) {
+    console.error(err);
+    process.exit(1);
+  }
+
+  // Low-level upgrade visibility for debugging WebSocket handshake issues.
+  if (fastify.server) {
+    fastify.server.on('upgrade', (req, socket, head) => {
+      console.log('[Upgrade] Incoming upgrade request', {
+        url: req.url,
+        headers: req.headers,
+      });
+    });
+  }
+
+  console.log(`Backend listening on ${address}`);
+});
 }
