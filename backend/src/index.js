@@ -170,6 +170,27 @@ fastify.register(fastifyWs, {
   },
 });
 
+// Log route table at startup to confirm WebSocket route registration in production.
+fastify.ready()
+  .then(() => {
+    console.log('[Startup] Routes registered:\n' + fastify.printRoutes());
+  })
+  .catch((err) => {
+    console.error('[Startup] Failed to build route table:', err);
+  });
+
+// If the WebSocket route is not matched, log it to diagnose 101 failures.
+fastify.setNotFoundHandler((request, reply) => {
+  if (request.url.startsWith('/twilio-media')) {
+    console.warn('[NotFound] Unmatched WebSocket route:', {
+      method: request.method,
+      url: request.url,
+      headers: request.headers,
+    });
+  }
+  reply.code(404).send('Not Found');
+});
+
 /**
  * Twilio Voice webhook.  Responds with TwiML instructing Twilio to connect
  * the caller to a WebSocket media stream.  If a `businessId` query param is
