@@ -148,43 +148,11 @@ function createAgent(businessId, callSid) {
 // Create and configure Fastify instance
 const fastify = Fastify();
 
-// Add request logging for all requests to help diagnose WebSocket issues
-fastify.addHook('onRequest', async (request, reply) => {
-  if (request.url.includes('twilio-media')) {
-    console.log(`[Request] ${request.method} ${request.url}`);
-    console.log(`[Request] Headers:`, JSON.stringify(request.headers, null, 2));
-    console.log(`[Request] Upgrade header:`, request.headers.upgrade);
-    console.log(`[Request] Connection header:`, request.headers.connection);
-    console.log(`[Request] Is WebSocket upgrade:`, request.headers.upgrade === 'websocket');
-  }
-});
-
 fastify.register(fastifyCors, {
   origin: true, // Allow all origins in development
   credentials: true,
 });
 fastify.register(fastifyFormBody);
-
-// Log route table at startup to confirm WebSocket route registration in production.
-fastify.ready()
-  .then(() => {
-    console.log('[Startup] Routes registered:\n' + fastify.printRoutes());
-  })
-  .catch((err) => {
-    console.error('[Startup] Failed to build route table:', err);
-  });
-
-// If the WebSocket route is not matched, log it to diagnose 101 failures.
-fastify.setNotFoundHandler((request, reply) => {
-  if (request.url.startsWith('/twilio-media')) {
-    console.warn('[NotFound] Unmatched WebSocket route:', {
-      method: request.method,
-      url: request.url,
-      headers: request.headers,
-    });
-  }
-  reply.code(404).send('Not Found');
-});
 
 // Dedicated WebSocket server for Twilio Media Streams to ensure a clean 101 upgrade.
 const wss = new WebSocketServer({ noServer: true, maxPayload: 1048576 });
@@ -452,18 +420,11 @@ fastify.listen({ port: PORT, host: '0.0.0.0' }, (err, address) => {
   }
 
   if (fastify.server) {
-    // Low-level upgrade visibility for debugging WebSocket handshake issues.
     fastify.server.on('upgrade', (req, socket, head) => {
-      console.log('[Upgrade] Incoming upgrade request', {
-        url: req.url,
-        headers: req.headers,
-      });
-
       try {
         const { pathname } = new URL(req.url, 'http://localhost');
         if (pathname.startsWith('/twilio-media/')) {
           wss.handleUpgrade(req, socket, head, (ws) => {
-            console.log('[Upgrade] WebSocket upgrade accepted');
             wss.emit('connection', ws, req);
           });
           return;
