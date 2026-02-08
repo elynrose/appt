@@ -395,6 +395,7 @@ wss.on('connection', async (ws, req) => {
         event.message?.event === 'start'
       ) {
         greeted = true;
+        stopHoldAudio();
         session.sendMessage('Please greet the caller now.');
       }
     });
