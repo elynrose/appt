@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase.js';
 
 /**
@@ -18,6 +18,9 @@ export default function Calls({ businessId }) {
   const [selectedCall, setSelectedCall] = useState(null);
   const [appointments, setAppointments] = useState([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
+  const [callUpdateState, setCallUpdateState] = useState({ saving: false, error: null });
+  const [callStatus, setCallStatus] = useState('');
+  const [callNotes, setCallNotes] = useState('');
 
   useEffect(() => {
     if (!businessId) return;
@@ -35,6 +38,13 @@ export default function Calls({ businessId }) {
     });
     return () => unsub();
   }, [businessId, statusFilter, sortOrder]);
+
+  useEffect(() => {
+    if (!selectedCall) return;
+    setCallStatus(selectedCall.status || '');
+    setCallNotes(selectedCall.ownerNotes || '');
+    setCallUpdateState({ saving: false, error: null });
+  }, [selectedCall]);
 
   useEffect(() => {
     if (!businessId) return;
@@ -57,6 +67,23 @@ export default function Calls({ businessId }) {
     });
     return () => unsub();
   }, [businessId, selectedCall]);
+
+  const handleCallUpdate = async (e) => {
+    e.preventDefault();
+    if (!businessId || !selectedCall?.id) return;
+    setCallUpdateState({ saving: true, error: null });
+    try {
+      await updateDoc(doc(db, `businesses/${businessId}/calls`, selectedCall.id), {
+        status: callStatus || null,
+        ownerNotes: callNotes || null,
+        updatedAt: serverTimestamp(),
+      });
+      setCallUpdateState({ saving: false, error: null });
+    } catch (err) {
+      console.error(err);
+      setCallUpdateState({ saving: false, error: 'Failed to update call.' });
+    }
+  };
 
   if (!businessId) {
     return <div>Missing businessId.  Contact your administrator.</div>;
@@ -113,6 +140,45 @@ export default function Calls({ businessId }) {
 
       {selectedCall && (
         <div style={{ marginTop: '2rem' }}>
+          <h3>Call Details</h3>
+          <div className="card" style={{ marginBottom: '1rem' }}>
+            <div className="card-header">
+              <div>
+                <strong>{selectedCall.from || 'Unknown caller'}</strong>
+                <div style={{ fontSize: '0.8rem', color: '#555' }}>
+                  To {selectedCall.to || 'Unknown number'}
+                </div>
+              </div>
+              <span className={`badge ${selectedCall.status}`}>{selectedCall.status?.replace('_', ' ')}</span>
+            </div>
+            {selectedCall.summary && <p style={{ marginTop: '0.5rem' }}>{selectedCall.summary}</p>}
+            <form onSubmit={handleCallUpdate} style={{ marginTop: '1rem' }}>
+              <div className="form-group">
+                <label htmlFor="call-status">Status</label>
+                <select id="call-status" value={callStatus} onChange={(e) => setCallStatus(e.target.value)}>
+                  <option value="">Unspecified</option>
+                  <option value="booked">Booked</option>
+                  <option value="needs_follow_up">Needs follow up</option>
+                  <option value="missed">Missed</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label htmlFor="call-notes">Internal notes</label>
+                <textarea
+                  id="call-notes"
+                  rows="3"
+                  value={callNotes}
+                  onChange={(e) => setCallNotes(e.target.value)}
+                  placeholder="Add notes for your team"
+                />
+              </div>
+              {callUpdateState.error && <div style={{ color: 'red', marginBottom: '0.75rem' }}>{callUpdateState.error}</div>}
+              <button className="button" type="submit" disabled={callUpdateState.saving}>
+                {callUpdateState.saving ? 'Saving…' : 'Update call'}
+              </button>
+            </form>
+          </div>
+
           <h3>Appointments for {selectedCall.from || 'Unknown number'}</h3>
           {!selectedCall.from && (
             <div>This call does not include a caller phone number.</div>

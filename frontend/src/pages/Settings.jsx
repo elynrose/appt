@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../firebase.js';
 
 /**
@@ -12,6 +12,9 @@ import { db } from '../firebase.js';
 export default function Settings({ businessId, user }) {
   const [business, setBusiness] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [profileState, setProfileState] = useState({ name: '', timezone: 'America/New_York' });
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState(null);
 
   const [accountSid, setAccountSid] = useState('');
   const [authToken, setAuthToken] = useState('');
@@ -25,7 +28,12 @@ export default function Settings({ businessId, user }) {
         const docRef = doc(db, 'businesses', businessId);
         const snap = await getDoc(docRef);
         if (snap.exists()) {
-          setBusiness(snap.data());
+          const data = snap.data();
+          setBusiness(data);
+          setProfileState({
+            name: data.name || data.businessName || '',
+            timezone: data.timezone || 'America/New_York',
+          });
         } else {
           setBusiness(null);
         }
@@ -37,6 +45,39 @@ export default function Settings({ businessId, user }) {
     }
     fetchBusiness();
   }, [businessId]);
+
+  const timezones = [
+    { value: 'America/New_York', label: 'Eastern Time (ET)' },
+    { value: 'America/Chicago', label: 'Central Time (CT)' },
+    { value: 'America/Denver', label: 'Mountain Time (MT)' },
+    { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
+    { value: 'America/Phoenix', label: 'Arizona Time (MST)' },
+    { value: 'America/Anchorage', label: 'Alaska Time (AKT)' },
+    { value: 'Pacific/Honolulu', label: 'Hawaii Time (HST)' },
+  ];
+
+  const handleProfileSave = async (e) => {
+    e.preventDefault();
+    if (!businessId) return;
+    if (!profileState.name.trim()) {
+      setProfileError('Business name is required.');
+      return;
+    }
+    setProfileSaving(true);
+    setProfileError(null);
+    try {
+      await updateDoc(doc(db, 'businesses', businessId), {
+        name: profileState.name.trim(),
+        timezone: profileState.timezone,
+        updatedAt: serverTimestamp(),
+      });
+      setProfileSaving(false);
+    } catch (err) {
+      console.error(err);
+      setProfileError('Failed to update business profile.');
+      setProfileSaving(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -72,6 +113,39 @@ export default function Settings({ businessId, user }) {
       <h2>Settings</h2>
       <p>Signed in as <strong>{user.email}</strong></p>
       <p>Business plan: <strong>{plan}</strong></p>
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <h3>Business profile</h3>
+        <form onSubmit={handleProfileSave}>
+          <div className="form-group">
+            <label htmlFor="business-name">Business name</label>
+            <input
+              id="business-name"
+              value={profileState.name}
+              onChange={(e) => setProfileState((prev) => ({ ...prev, name: e.target.value }))}
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label htmlFor="business-timezone">Timezone</label>
+            <select
+              id="business-timezone"
+              value={profileState.timezone}
+              onChange={(e) => setProfileState((prev) => ({ ...prev, timezone: e.target.value }))}
+              required
+            >
+              {timezones.map((tz) => (
+                <option key={tz.value} value={tz.value}>
+                  {tz.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          {profileError && <div style={{ color: 'red', marginBottom: '0.75rem' }}>{profileError}</div>}
+          <button className="button" type="submit" disabled={profileSaving}>
+            {profileSaving ? 'Saving…' : 'Update profile'}
+          </button>
+        </form>
+      </div>
       {plan === 'basic' && (
         <div className="card">
           <p>You are on the <strong>Basic</strong> plan.  Calls to your assigned Twilio number will be routed using the shared bridge.  Upgrade to Premium to connect your own number and customise the agent.</p>
