@@ -10,6 +10,10 @@ import { WebSocketServer } from 'ws';
 import dotenv from 'dotenv';
 import z from 'zod';
 import { Buffer } from 'buffer';
+import fs from 'fs';
+import path from 'path';
+import fs from 'fs';
+import path from 'path';
 
 /*
  * Backend entry point for the agentic appointment scheduling application.
@@ -149,6 +153,26 @@ function createAgent(businessId, callSid) {
 
 // Create and configure Fastify instance
 const fastify = Fastify();
+
+// Load hold audio (8kHz mu-law) into memory for looping playback.
+const holdAudioPath = path.resolve('assets', 'hold.mulaw');
+let holdAudioBuffer = null;
+try {
+  holdAudioBuffer = fs.readFileSync(holdAudioPath);
+  console.log(`[Startup] Loaded hold audio: ${holdAudioPath} (${holdAudioBuffer.length} bytes)`);
+} catch (err) {
+  console.warn('[Startup] Hold audio not found, skipping hold audio:', err.message);
+}
+
+// Load hold audio (8kHz μ-law) into memory for looping playback.
+const holdAudioPath = path.resolve('assets', 'hold.mulaw');
+let holdAudioBuffer = null;
+try {
+  holdAudioBuffer = fs.readFileSync(holdAudioPath);
+  console.log(`[Startup] Loaded hold audio: ${holdAudioPath} (${holdAudioBuffer.length} bytes)`);
+} catch (err) {
+  console.warn('[Startup] Hold audio not found, skipping hold music:', err.message);
+}
 
 fastify.register(fastifyCors, {
   origin: true, // Allow all origins in development
@@ -309,6 +333,26 @@ wss.on('connection', async (ws, req) => {
     console.error(`[WebSocket] ❌ Socket error:`, err);
   });
 
+  let streamSid = null;
+  ws.on('message', (message) => {
+    try {
+      const data = JSON.parse(message.toString());
+      if (data.event === 'start' && data.start?.streamSid) {
+        streamSid = data.start.streamSid;
+      }
+    } catch (err) {
+      // Ignore non-JSON messages.
+    }
+  });
+
+  let holdInterval = null;
+  const stopHoldAudio = () => {
+    if (holdInterval) {
+      clearInterval(holdInterval);
+      holdInterval = null;
+    }
+  };
+
   if (!businessId || !callSid) {
     console.error(`[WebSocket] Missing required parameters - businessId: ${businessId}, callSid: ${callSid}`);
     ws.close();
@@ -331,6 +375,31 @@ wss.on('connection', async (ws, req) => {
     console.log(`[WebSocket] Connecting to OpenAI Realtime API...`);
     await session.connect({ apiKey: process.env.OPENAI_API_KEY });
     let greeted = false;
+
+    let sawResponseAudio = false;
+    if (holdAudioBuffer) {
+      const chunkSize = 160; // 20ms at 8kHz mu-law
+      let offset = 0;
+      holdInterval = setInterval(() => {
+        if (!holdAudioBuffer || !ws || ws.readyState !== ws.OPEN) return;
+        if (sawResponseAudio) return;
+        if (!streamSid) return;
+        if (offset >= holdAudioBuffer.length) {
+          offset = 0;
+        }
+        const chunk = holdAudioBuffer.subarray(offset, offset + chunkSize);
+        offset += chunkSize;
+        ws.send(
+          JSON.stringify({
+            event: 'media',
+            streamSid,
+            media: {
+              payload: chunk.toString('base64'),
+            },
+          }),
+        );
+      }, 20);
+    }
     transport.on('*', (event) => {
       if (
         !greeted &&
@@ -341,8 +410,17 @@ wss.on('connection', async (ws, req) => {
         session.sendMessage('Please greet the caller now.');
       }
     });
+
+    transport.on('audio', (event) => {
+      sawResponseAudio = true;
+      stopHoldAudio();
+    });
+    transport.on('error', () => {
+      stopHoldAudio();
+    });
     console.log(`[WebSocket] ✅ Realtime session started for call ${callSid} (business ${businessId}).`);
   } catch (err) {
+    stopHoldAudio();
     console.error(`[WebSocket] ❌ Realtime session error for call ${callSid}:`, err);
     console.error('Error details:', {
       message: err.message,
