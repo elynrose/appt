@@ -88,6 +88,7 @@ async function resolveBusinessId(toNumber) {
  * @param {string} callSid
  */
 function createAgent(businessId, callSid) {
+  const voice = process.env.REALTIME_VOICE || 'marin';
   // Define the appointment scheduling tool.  zod provides runtime validation
   // similar to the example in Twilio’s tutorial【671551374085659†L952-L974】.
   const createAppointmentTool = tool({
@@ -138,6 +139,7 @@ function createAgent(businessId, callSid) {
   // tool.  They can be adjusted per business for custom workflows.
   const agent = new RealtimeAgent({
     name: 'Scheduling Assistant',
+    voice,
     instructions:
       'You are a friendly and efficient scheduling assistant. Speak only English unless the caller explicitly says "español". If they say "español", switch to Spanish for the remainder of the call. Do not use any other language. Start every call by asking which language the caller prefers to speak. Collect the caller’s name, contact details, the service they want, the desired appointment date and time, and any relevant notes. Confirm the details with the caller before calling the create_appointment tool.',
     tools: [createAppointmentTool],
