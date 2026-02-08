@@ -162,16 +162,6 @@ try {
   console.warn('[Startup] Hold audio not found, skipping hold audio:', err.message);
 }
 
-// Load hold audio (8kHz μ-law) into memory for looping playback.
-const holdAudioPath = path.resolve('assets', 'hold.mulaw');
-let holdAudioBuffer = null;
-try {
-  holdAudioBuffer = fs.readFileSync(holdAudioPath);
-  console.log(`[Startup] Loaded hold audio: ${holdAudioPath} (${holdAudioBuffer.length} bytes)`);
-} catch (err) {
-  console.warn('[Startup] Hold audio not found, skipping hold music:', err.message);
-}
-
 fastify.register(fastifyCors, {
   origin: true, // Allow all origins in development
   credentials: true,
