@@ -12,8 +12,6 @@ import z from 'zod';
 import { Buffer } from 'buffer';
 import fs from 'fs';
 import path from 'path';
-import fs from 'fs';
-import path from 'path';
 
 /*
  * Backend entry point for the agentic appointment scheduling application.
