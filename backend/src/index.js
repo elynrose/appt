@@ -394,9 +394,11 @@ wss.on('connection', async (ws, req) => {
         event.type === 'twilio_message' &&
         event.message?.event === 'start'
       ) {
+        // Start hold audio, then greet after a short ring.
         greeted = true;
-        stopHoldAudio();
-        session.sendMessage('Please greet the caller now.');
+        setTimeout(() => {
+          session.sendMessage('Please greet the caller now.');
+        }, 1200);
       }
     });
 
