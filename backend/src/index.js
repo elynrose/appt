@@ -131,6 +131,23 @@ function createAgent(businessId, callSid) {
         createdAt: FieldValue.serverTimestamp(),
       };
       await docRef.set(appointment);
+      // Mark the originating call as booked if it exists.
+      try {
+        await db
+          .collection('businesses')
+          .doc(businessId)
+          .collection('calls')
+          .doc(callSid)
+          .set(
+            {
+              status: 'booked',
+              updatedAt: FieldValue.serverTimestamp(),
+            },
+            { merge: true },
+          );
+      } catch (err) {
+        console.error('[Appointments] Failed to update call status:', err);
+      }
       // Return a confirmation message.  The agent will read this back to the caller.
       return `I have saved your appointment for ${input.service} on ${input.startTime}.`;
     },
@@ -221,6 +238,9 @@ fastify.all('/voice', async (request, reply) => {
     // Ensure we have CallSid and To (should be in body from Twilio)
     const finalCallSid = callSid || `CA${Date.now()}`;
     const finalToNumber = toNumber || request.body?.Called || '';
+    const twilioStatus = request.body?.CallStatus || 'ringing';
+    const missedStatuses = new Set(['no-answer', 'busy', 'failed', 'canceled']);
+    const initialStatus = missedStatuses.has(twilioStatus) ? 'missed' : twilioStatus;
 
     // Persist the call record for the business (if Firestore is available)
     if (db) {
@@ -236,7 +256,7 @@ fastify.all('/voice', async (request, reply) => {
               businessId,
               from: fromNumber || null,
               to: finalToNumber || null,
-              status: request.body?.CallStatus || 'ringing',
+              status: initialStatus,
               plan,
               source: 'twilio_voice',
               startedAt: FieldValue.serverTimestamp(),
@@ -315,6 +335,39 @@ wss.on('connection', async (ws, req) => {
 
   ws.on('close', (code, reason) => {
     console.log(`[WebSocket] ❌ Connection closed - code: ${code}, reason: ${reason}`);
+    if (db && businessId && callSid) {
+      (async () => {
+        try {
+          const callRef = db
+            .collection('businesses')
+            .doc(businessId)
+            .collection('calls')
+            .doc(callSid);
+          const callSnap = await callRef.get();
+          const currentStatus = callSnap.exists ? callSnap.data()?.status : null;
+          if (currentStatus === 'missed' || currentStatus === 'booked') {
+            return;
+          }
+          const apptSnap = await db
+            .collection('businesses')
+            .doc(businessId)
+            .collection('appointments')
+            .where('callSid', '==', callSid)
+            .limit(1)
+            .get();
+          const nextStatus = apptSnap.empty ? 'needs_follow_up' : 'booked';
+          await callRef.set(
+            {
+              status: nextStatus,
+              updatedAt: FieldValue.serverTimestamp(),
+            },
+            { merge: true },
+          );
+        } catch (err) {
+          console.error('[WebSocket] Failed to auto-update call status:', err);
+        }
+      })();
+    }
   });
 
   ws.on('error', (err) => {
