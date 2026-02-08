@@ -14,6 +14,7 @@ export default function Services({ businessId }) {
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
   useEffect(() => {
     if (!businessId) return;
     const svcRef = collection(db, `businesses/${businessId}/services`);
@@ -56,6 +57,7 @@ export default function Services({ businessId }) {
         });
       }
       resetForm();
+      setModalOpen(false);
     } catch (err) {
       console.error(err);
       setError('Failed to save service.');
@@ -72,6 +74,7 @@ export default function Services({ businessId }) {
       durationMins: svc.durationMins ?? '',
       description: svc.description || '',
     });
+    setModalOpen(true);
   };
 
   const handleDelete = async (svcId) => {
@@ -91,64 +94,16 @@ export default function Services({ businessId }) {
   return (
     <div>
       <h2>Services</h2>
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <h3 style={{ marginTop: 0 }}>{editingId ? 'Edit service' : 'Add a service'}</h3>
-        <form onSubmit={handleSave}>
-          <div className="form-group">
-            <label htmlFor="svc-name">Service name</label>
-            <input
-              id="svc-name"
-              value={formState.name}
-              onChange={(e) => setFormState((prev) => ({ ...prev, name: e.target.value }))}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="svc-price">Price (USD)</label>
-            <input
-              id="svc-price"
-              type="number"
-              min="0"
-              step="0.01"
-              value={formState.price}
-              onChange={(e) => setFormState((prev) => ({ ...prev, price: e.target.value }))}
-              placeholder="e.g. 75"
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="svc-duration">Duration (minutes)</label>
-            <input
-              id="svc-duration"
-              type="number"
-              min="0"
-              step="5"
-              value={formState.durationMins}
-              onChange={(e) => setFormState((prev) => ({ ...prev, durationMins: e.target.value }))}
-              placeholder="e.g. 60"
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="svc-desc">Description</label>
-            <textarea
-              id="svc-desc"
-              rows="3"
-              value={formState.description}
-              onChange={(e) => setFormState((prev) => ({ ...prev, description: e.target.value }))}
-              placeholder="Optional details about this service"
-            />
-          </div>
-          {error && <div style={{ color: 'red', marginBottom: '0.75rem' }}>{error}</div>}
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button className="button" type="submit" disabled={saving}>
-              {saving ? 'Saving…' : editingId ? 'Update service' : 'Add service'}
-            </button>
-            {editingId && (
-              <button type="button" className="button" style={{ background: '#6c757d' }} onClick={resetForm}>
-                Cancel
-              </button>
-            )}
-          </div>
-        </form>
+      <div style={{ marginBottom: '1rem' }}>
+        <button
+          className="button"
+          onClick={() => {
+            resetForm();
+            setModalOpen(true);
+          }}
+        >
+          Add service
+        </button>
       </div>
       {services.length === 0 && <div>No services defined yet.</div>}
       {services.map((svc) => (
@@ -167,6 +122,81 @@ export default function Services({ businessId }) {
           </div>
         </div>
       ))}
+
+      {modalOpen && (
+        <div className="modal-backdrop" onClick={() => setModalOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">{editingId ? 'Edit service' : 'Add a service'}</h3>
+              <button className="modal-close" type="button" onClick={() => setModalOpen(false)}>
+                ✕
+              </button>
+            </div>
+            <form onSubmit={handleSave}>
+              <div className="form-group">
+                <label htmlFor="svc-name">Service name</label>
+                <input
+                  id="svc-name"
+                  value={formState.name}
+                  onChange={(e) => setFormState((prev) => ({ ...prev, name: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="svc-price">Price (USD)</label>
+                <input
+                  id="svc-price"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formState.price}
+                  onChange={(e) => setFormState((prev) => ({ ...prev, price: e.target.value }))}
+                  placeholder="e.g. 75"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="svc-duration">Duration (minutes)</label>
+                <input
+                  id="svc-duration"
+                  type="number"
+                  min="0"
+                  step="5"
+                  value={formState.durationMins}
+                  onChange={(e) => setFormState((prev) => ({ ...prev, durationMins: e.target.value }))}
+                  placeholder="e.g. 60"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="svc-desc">Description</label>
+                <textarea
+                  id="svc-desc"
+                  rows="3"
+                  value={formState.description}
+                  onChange={(e) => setFormState((prev) => ({ ...prev, description: e.target.value }))}
+                  placeholder="Optional details about this service"
+                />
+              </div>
+              {error && <div style={{ color: 'red', marginBottom: '0.75rem' }}>{error}</div>}
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button className="button" type="submit" disabled={saving}>
+                  {saving ? 'Saving…' : editingId ? 'Update service' : 'Add service'}
+                </button>
+                <button
+                  type="button"
+                  className="button"
+                  style={{ background: '#6c757d' }}
+                  onClick={() => {
+                    resetForm();
+                    setModalOpen(false);
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

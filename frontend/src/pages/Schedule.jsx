@@ -38,6 +38,7 @@ export default function Schedule({ businessId }) {
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   useEffect(() => {
     if (!businessId) return;
@@ -129,6 +130,7 @@ export default function Schedule({ businessId }) {
         });
       }
       resetForm();
+      setModalOpen(false);
     } catch (err) {
       console.error(err);
       setError('Failed to save appointment.');
@@ -151,6 +153,7 @@ export default function Schedule({ businessId }) {
       notes: appt.notes || '',
       status: appt.status || 'pending_confirmation',
     });
+    setModalOpen(true);
   };
 
   const handleDelete = async (apptId) => {
@@ -170,105 +173,16 @@ export default function Schedule({ businessId }) {
   return (
     <div>
       <h2>Schedule</h2>
-      <div className="card" style={{ marginBottom: '1rem' }}>
-        <h3 style={{ marginTop: 0 }}>{editingId ? 'Edit appointment' : 'Add appointment'}</h3>
-        <form onSubmit={handleSave}>
-          <div className="form-group">
-            <label htmlFor="appt-name">Customer name</label>
-            <input
-              id="appt-name"
-              value={formState.name}
-              onChange={(e) => setFormState((prev) => ({ ...prev, name: e.target.value }))}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="appt-phone">Phone</label>
-            <input
-              id="appt-phone"
-              value={formState.phone}
-              onChange={(e) => setFormState((prev) => ({ ...prev, phone: e.target.value }))}
-              placeholder="+15551234567"
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="appt-email">Email</label>
-            <input
-              id="appt-email"
-              type="email"
-              value={formState.email}
-              onChange={(e) => setFormState((prev) => ({ ...prev, email: e.target.value }))}
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="appt-service">Service</label>
-            <select
-              id="appt-service"
-              value={formState.service}
-              onChange={(e) => setFormState((prev) => ({ ...prev, service: e.target.value }))}
-              required
-            >
-              <option value="">Select a service</option>
-              {services.map((svc) => (
-                <option key={svc.id} value={svc.name}>
-                  {svc.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="form-group">
-            <label htmlFor="appt-start">Start time</label>
-            <input
-              id="appt-start"
-              type="datetime-local"
-              value={formState.startTime}
-              onChange={(e) => setFormState((prev) => ({ ...prev, startTime: e.target.value }))}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="appt-end">End time</label>
-            <input
-              id="appt-end"
-              type="datetime-local"
-              value={formState.endTime}
-              onChange={(e) => setFormState((prev) => ({ ...prev, endTime: e.target.value }))}
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="appt-status">Status</label>
-            <select
-              id="appt-status"
-              value={formState.status}
-              onChange={(e) => setFormState((prev) => ({ ...prev, status: e.target.value }))}
-            >
-              <option value="pending_confirmation">Pending</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="completed">Completed</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-          </div>
-          <div className="form-group">
-            <label htmlFor="appt-notes">Notes</label>
-            <textarea
-              id="appt-notes"
-              rows="3"
-              value={formState.notes}
-              onChange={(e) => setFormState((prev) => ({ ...prev, notes: e.target.value }))}
-            />
-          </div>
-          {error && <div style={{ color: 'red', marginBottom: '0.75rem' }}>{error}</div>}
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            <button className="button" type="submit" disabled={saving}>
-              {saving ? 'Saving…' : editingId ? 'Update appointment' : 'Add appointment'}
-            </button>
-            {editingId && (
-              <button type="button" className="button" style={{ background: '#6c757d' }} onClick={resetForm}>
-                Cancel
-              </button>
-            )}
-          </div>
-        </form>
+      <div style={{ marginBottom: '1rem' }}>
+        <button
+          className="button"
+          onClick={() => {
+            resetForm();
+            setModalOpen(true);
+          }}
+        >
+          Add appointment
+        </button>
       </div>
       {appointments.length === 0 && <div>No appointments scheduled.</div>}
       {appointments.map((appt) => {
@@ -293,6 +207,122 @@ export default function Schedule({ businessId }) {
           </div>
         );
       })}
+
+      {modalOpen && (
+        <div className="modal-backdrop" onClick={() => setModalOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">{editingId ? 'Edit appointment' : 'Add appointment'}</h3>
+              <button className="modal-close" type="button" onClick={() => setModalOpen(false)}>
+                ✕
+              </button>
+            </div>
+            <form onSubmit={handleSave}>
+              <div className="form-group">
+                <label htmlFor="appt-name">Customer name</label>
+                <input
+                  id="appt-name"
+                  value={formState.name}
+                  onChange={(e) => setFormState((prev) => ({ ...prev, name: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="appt-phone">Phone</label>
+                <input
+                  id="appt-phone"
+                  value={formState.phone}
+                  onChange={(e) => setFormState((prev) => ({ ...prev, phone: e.target.value }))}
+                  placeholder="+15551234567"
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="appt-email">Email</label>
+                <input
+                  id="appt-email"
+                  type="email"
+                  value={formState.email}
+                  onChange={(e) => setFormState((prev) => ({ ...prev, email: e.target.value }))}
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="appt-service">Service</label>
+                <select
+                  id="appt-service"
+                  value={formState.service}
+                  onChange={(e) => setFormState((prev) => ({ ...prev, service: e.target.value }))}
+                  required
+                >
+                  <option value="">Select a service</option>
+                  {services.map((svc) => (
+                    <option key={svc.id} value={svc.name}>
+                      {svc.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label htmlFor="appt-start">Start time</label>
+                <input
+                  id="appt-start"
+                  type="datetime-local"
+                  value={formState.startTime}
+                  onChange={(e) => setFormState((prev) => ({ ...prev, startTime: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="appt-end">End time</label>
+                <input
+                  id="appt-end"
+                  type="datetime-local"
+                  value={formState.endTime}
+                  onChange={(e) => setFormState((prev) => ({ ...prev, endTime: e.target.value }))}
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="appt-status">Status</label>
+                <select
+                  id="appt-status"
+                  value={formState.status}
+                  onChange={(e) => setFormState((prev) => ({ ...prev, status: e.target.value }))}
+                >
+                  <option value="pending_confirmation">Pending</option>
+                  <option value="confirmed">Confirmed</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label htmlFor="appt-notes">Notes</label>
+                <textarea
+                  id="appt-notes"
+                  rows="3"
+                  value={formState.notes}
+                  onChange={(e) => setFormState((prev) => ({ ...prev, notes: e.target.value }))}
+                />
+              </div>
+              {error && <div style={{ color: 'red', marginBottom: '0.75rem' }}>{error}</div>}
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button className="button" type="submit" disabled={saving}>
+                  {saving ? 'Saving…' : editingId ? 'Update appointment' : 'Add appointment'}
+                </button>
+                <button
+                  type="button"
+                  className="button"
+                  style={{ background: '#6c757d' }}
+                  onClick={() => {
+                    resetForm();
+                    setModalOpen(false);
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

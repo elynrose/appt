@@ -15,6 +15,8 @@ export default function Settings({ businessId, user }) {
   const [profileState, setProfileState] = useState({ name: '', timezone: 'America/New_York' });
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileError, setProfileError] = useState(null);
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [twilioModalOpen, setTwilioModalOpen] = useState(false);
 
   const [accountSid, setAccountSid] = useState('');
   const [authToken, setAuthToken] = useState('');
@@ -92,12 +94,15 @@ export default function Settings({ businessId, user }) {
       const data = await res.json();
       if (data.ok) {
         setSubmitState({ loading: false, message: data.message, error: null, validated: true });
+        return true;
       } else {
         setSubmitState({ loading: false, message: null, error: data.error || 'Unknown error', validated: false });
+        return false;
       }
     } catch (err) {
       console.error(err);
       setSubmitState({ loading: false, message: null, error: 'Request failed', validated: false });
+      return false;
     }
   };
 
@@ -115,36 +120,13 @@ export default function Settings({ businessId, user }) {
       <p>Business plan: <strong>{plan}</strong></p>
       <div className="card" style={{ marginBottom: '1rem' }}>
         <h3>Business profile</h3>
-        <form onSubmit={handleProfileSave}>
-          <div className="form-group">
-            <label htmlFor="business-name">Business name</label>
-            <input
-              id="business-name"
-              value={profileState.name}
-              onChange={(e) => setProfileState((prev) => ({ ...prev, name: e.target.value }))}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="business-timezone">Timezone</label>
-            <select
-              id="business-timezone"
-              value={profileState.timezone}
-              onChange={(e) => setProfileState((prev) => ({ ...prev, timezone: e.target.value }))}
-              required
-            >
-              {timezones.map((tz) => (
-                <option key={tz.value} value={tz.value}>
-                  {tz.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          {profileError && <div style={{ color: 'red', marginBottom: '0.75rem' }}>{profileError}</div>}
-          <button className="button" type="submit" disabled={profileSaving}>
-            {profileSaving ? 'Saving…' : 'Update profile'}
-          </button>
-        </form>
+        <p style={{ marginTop: 0 }}>
+          {profileState.name || 'Business name not set'}
+        </p>
+        <p style={{ color: '#666' }}>{profileState.timezone}</p>
+        <button className="button" type="button" onClick={() => setProfileModalOpen(true)}>
+          Edit profile
+        </button>
       </div>
       {plan === 'basic' && (
         <div className="card">
@@ -155,27 +137,14 @@ export default function Settings({ businessId, user }) {
         <div className="card">
           <h3>Twilio Integration</h3>
           {!submitState.validated ? (
-            <form onSubmit={handleSubmit}>
+            <div>
               <p style={{ marginBottom: '1rem', color: '#666' }}>
-                Enter your Twilio credentials to validate them. After validation, you'll receive instructions to complete the setup.
+                Validate your Twilio credentials to connect a dedicated number.
               </p>
-              <div className="form-group">
-                <label htmlFor="accountSid">Account SID</label>
-                <input id="accountSid" value={accountSid} onChange={(e) => setAccountSid(e.target.value)} placeholder="AC..." required />
-              </div>
-              <div className="form-group">
-                <label htmlFor="authToken">Auth Token</label>
-                <input id="authToken" type="password" value={authToken} onChange={(e) => setAuthToken(e.target.value)} required />
-              </div>
-              <div className="form-group">
-                <label htmlFor="phoneNumber">Phone Number (E.164)</label>
-                <input id="phoneNumber" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="+15551234567" required />
-              </div>
-              {submitState.error && <div style={{ color: 'red', marginBottom: '0.5rem', padding: '0.75rem', background: '#ffe6e6', borderRadius: '4px' }}>{submitState.error}</div>}
-              <button type="submit" className="button" disabled={submitState.loading}>
-                {submitState.loading ? 'Validating…' : 'Validate Credentials'}
+              <button className="button" type="button" onClick={() => setTwilioModalOpen(true)}>
+                Enter credentials
               </button>
-            </form>
+            </div>
           ) : (
             <div>
               <div style={{ color: 'green', marginBottom: '1rem', padding: '0.75rem', background: '#e6f7e6', borderRadius: '4px' }}>
@@ -222,6 +191,108 @@ export default function Settings({ businessId, user }) {
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {profileModalOpen && (
+        <div className="modal-backdrop" onClick={() => setProfileModalOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Edit business profile</h3>
+              <button className="modal-close" type="button" onClick={() => setProfileModalOpen(false)}>
+                ✕
+              </button>
+            </div>
+            <form onSubmit={handleProfileSave}>
+              <div className="form-group">
+                <label htmlFor="business-name">Business name</label>
+                <input
+                  id="business-name"
+                  value={profileState.name}
+                  onChange={(e) => setProfileState((prev) => ({ ...prev, name: e.target.value }))}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="business-timezone">Timezone</label>
+                <select
+                  id="business-timezone"
+                  value={profileState.timezone}
+                  onChange={(e) => setProfileState((prev) => ({ ...prev, timezone: e.target.value }))}
+                  required
+                >
+                  {timezones.map((tz) => (
+                    <option key={tz.value} value={tz.value}>
+                      {tz.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {profileError && <div style={{ color: 'red', marginBottom: '0.75rem' }}>{profileError}</div>}
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button className="button" type="submit" disabled={profileSaving}>
+                  {profileSaving ? 'Saving…' : 'Update profile'}
+                </button>
+                <button
+                  type="button"
+                  className="button"
+                  style={{ background: '#6c757d' }}
+                  onClick={() => setProfileModalOpen(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {twilioModalOpen && (
+        <div className="modal-backdrop" onClick={() => setTwilioModalOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Validate Twilio credentials</h3>
+              <button className="modal-close" type="button" onClick={() => setTwilioModalOpen(false)}>
+                ✕
+              </button>
+            </div>
+            <form onSubmit={async (e) => {
+              const ok = await handleSubmit(e);
+              if (ok) {
+                setTwilioModalOpen(false);
+              }
+            }}>
+              <p style={{ marginBottom: '1rem', color: '#666' }}>
+                Enter your Twilio credentials to validate them. After validation, you'll receive instructions to complete the setup.
+              </p>
+              <div className="form-group">
+                <label htmlFor="accountSid">Account SID</label>
+                <input id="accountSid" value={accountSid} onChange={(e) => setAccountSid(e.target.value)} placeholder="AC..." required />
+              </div>
+              <div className="form-group">
+                <label htmlFor="authToken">Auth Token</label>
+                <input id="authToken" type="password" value={authToken} onChange={(e) => setAuthToken(e.target.value)} required />
+              </div>
+              <div className="form-group">
+                <label htmlFor="phoneNumber">Phone Number (E.164)</label>
+                <input id="phoneNumber" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="+15551234567" required />
+              </div>
+              {submitState.error && <div style={{ color: 'red', marginBottom: '0.5rem', padding: '0.75rem', background: '#ffe6e6', borderRadius: '4px' }}>{submitState.error}</div>}
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button type="submit" className="button" disabled={submitState.loading}>
+                  {submitState.loading ? 'Validating…' : 'Validate Credentials'}
+                </button>
+                <button
+                  type="button"
+                  className="button"
+                  style={{ background: '#6c757d' }}
+                  onClick={() => setTwilioModalOpen(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

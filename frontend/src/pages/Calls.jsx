@@ -21,6 +21,7 @@ export default function Calls({ businessId }) {
   const [callUpdateState, setCallUpdateState] = useState({ saving: false, error: null });
   const [callStatus, setCallStatus] = useState('');
   const [callNotes, setCallNotes] = useState('');
+  const [modalOpen, setModalOpen] = useState(false);
 
   useEffect(() => {
     if (!businessId) return;
@@ -113,7 +114,10 @@ export default function Calls({ businessId }) {
           <div
             key={call.id}
             className="card"
-            onClick={() => setSelectedCall(call)}
+            onClick={() => {
+              setSelectedCall(call);
+              setModalOpen(true);
+            }}
             style={{
               cursor: 'pointer',
               border: isSelected ? '2px solid #1a73e8' : undefined,
@@ -123,6 +127,7 @@ export default function Calls({ businessId }) {
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 setSelectedCall(call);
+                setModalOpen(true);
               }
             }}
           >
@@ -138,78 +143,85 @@ export default function Calls({ businessId }) {
         );
       })}
 
-      {selectedCall && (
-        <div style={{ marginTop: '2rem' }}>
-          <h3>Call Details</h3>
-          <div className="card" style={{ marginBottom: '1rem' }}>
-            <div className="card-header">
-              <div>
-                <strong>{selectedCall.from || 'Unknown caller'}</strong>
-                <div style={{ fontSize: '0.8rem', color: '#555' }}>
-                  To {selectedCall.to || 'Unknown number'}
-                </div>
-              </div>
-              <span className={`badge ${selectedCall.status}`}>{selectedCall.status?.replace('_', ' ')}</span>
-            </div>
-            {selectedCall.summary && <p style={{ marginTop: '0.5rem' }}>{selectedCall.summary}</p>}
-            <form onSubmit={handleCallUpdate} style={{ marginTop: '1rem' }}>
-              <div className="form-group">
-                <label htmlFor="call-status">Status</label>
-                <select id="call-status" value={callStatus} onChange={(e) => setCallStatus(e.target.value)}>
-                  <option value="">Unspecified</option>
-                  <option value="booked">Booked</option>
-                  <option value="needs_follow_up">Needs follow up</option>
-                  <option value="missed">Missed</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label htmlFor="call-notes">Internal notes</label>
-                <textarea
-                  id="call-notes"
-                  rows="3"
-                  value={callNotes}
-                  onChange={(e) => setCallNotes(e.target.value)}
-                  placeholder="Add notes for your team"
-                />
-              </div>
-              {callUpdateState.error && <div style={{ color: 'red', marginBottom: '0.75rem' }}>{callUpdateState.error}</div>}
-              <button className="button" type="submit" disabled={callUpdateState.saving}>
-                {callUpdateState.saving ? 'Saving…' : 'Update call'}
+      {selectedCall && modalOpen && (
+        <div className="modal-backdrop" onClick={() => setModalOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Call Details</h3>
+              <button className="modal-close" type="button" onClick={() => setModalOpen(false)}>
+                ✕
               </button>
-            </form>
-          </div>
-
-          <h3>Appointments for {selectedCall.from || 'Unknown number'}</h3>
-          {!selectedCall.from && (
-            <div>This call does not include a caller phone number.</div>
-          )}
-          {selectedCall.from && appointmentsLoading && <div>Loading appointments...</div>}
-          {selectedCall.from && !appointmentsLoading && appointments.length === 0 && (
-            <div>No appointments found for this number.</div>
-          )}
-          {selectedCall.from &&
-            appointments.map((appt) => {
-              const start = appt.startTime?.toDate?.() || null;
-              const end = appt.endTime?.toDate?.() || null;
-              const timeStr = start ? start.toLocaleString() : appt.startTime;
-              const endStr = end ? end.toLocaleString() : appt.endTime;
-              return (
-                <div key={appt.id} className="card">
-                  <div className="card-header">
-                    <div>
-                      <strong>{appt.service || 'Service'}</strong>
-                      <div style={{ fontSize: '0.8rem', color: '#555' }}>
-                        {timeStr}
-                        {endStr ? ` – ${endStr}` : ''}
-                      </div>
-                    </div>
-                    <span className="badge booked">{appt.status || 'pending'}</span>
+            </div>
+            <div className="card" style={{ marginBottom: '1rem' }}>
+              <div className="card-header">
+                <div>
+                  <strong>{selectedCall.from || 'Unknown caller'}</strong>
+                  <div style={{ fontSize: '0.8rem', color: '#555' }}>
+                    To {selectedCall.to || 'Unknown number'}
                   </div>
-                  <p style={{ marginTop: '0.5rem' }}>{appt.name || 'Unknown customer'}</p>
-                  {appt.notes && <p style={{ fontSize: '0.8rem', color: '#555' }}>{appt.notes}</p>}
                 </div>
-              );
-            })}
+                <span className={`badge ${selectedCall.status}`}>{selectedCall.status?.replace('_', ' ')}</span>
+              </div>
+              {selectedCall.summary && <p style={{ marginTop: '0.5rem' }}>{selectedCall.summary}</p>}
+              <form onSubmit={handleCallUpdate} style={{ marginTop: '1rem' }}>
+                <div className="form-group">
+                  <label htmlFor="call-status">Status</label>
+                  <select id="call-status" value={callStatus} onChange={(e) => setCallStatus(e.target.value)}>
+                    <option value="">Unspecified</option>
+                    <option value="booked">Booked</option>
+                    <option value="needs_follow_up">Needs follow up</option>
+                    <option value="missed">Missed</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label htmlFor="call-notes">Internal notes</label>
+                  <textarea
+                    id="call-notes"
+                    rows="3"
+                    value={callNotes}
+                    onChange={(e) => setCallNotes(e.target.value)}
+                    placeholder="Add notes for your team"
+                  />
+                </div>
+                {callUpdateState.error && <div style={{ color: 'red', marginBottom: '0.75rem' }}>{callUpdateState.error}</div>}
+                <button className="button" type="submit" disabled={callUpdateState.saving}>
+                  {callUpdateState.saving ? 'Saving…' : 'Update call'}
+                </button>
+              </form>
+            </div>
+
+            <h3>Appointments for {selectedCall.from || 'Unknown number'}</h3>
+            {!selectedCall.from && (
+              <div>This call does not include a caller phone number.</div>
+            )}
+            {selectedCall.from && appointmentsLoading && <div>Loading appointments...</div>}
+            {selectedCall.from && !appointmentsLoading && appointments.length === 0 && (
+              <div>No appointments found for this number.</div>
+            )}
+            {selectedCall.from &&
+              appointments.map((appt) => {
+                const start = appt.startTime?.toDate?.() || null;
+                const end = appt.endTime?.toDate?.() || null;
+                const timeStr = start ? start.toLocaleString() : appt.startTime;
+                const endStr = end ? end.toLocaleString() : appt.endTime;
+                return (
+                  <div key={appt.id} className="card">
+                    <div className="card-header">
+                      <div>
+                        <strong>{appt.service || 'Service'}</strong>
+                        <div style={{ fontSize: '0.8rem', color: '#555' }}>
+                          {timeStr}
+                          {endStr ? ` – ${endStr}` : ''}
+                        </div>
+                      </div>
+                      <span className="badge booked">{appt.status || 'pending'}</span>
+                    </div>
+                    <p style={{ marginTop: '0.5rem' }}>{appt.name || 'Unknown customer'}</p>
+                    {appt.notes && <p style={{ fontSize: '0.8rem', color: '#555' }}>{appt.notes}</p>}
+                  </div>
+                );
+              })}
+          </div>
         </div>
       )}
     </div>
