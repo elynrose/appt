@@ -15,6 +15,9 @@ export default function Calls({ businessId }) {
   const [calls, setCalls] = useState([]);
   const [statusFilter, setStatusFilter] = useState('all');
   const [sortOrder, setSortOrder] = useState('desc');
+  const [selectedCall, setSelectedCall] = useState(null);
+  const [appointments, setAppointments] = useState([]);
+  const [appointmentsLoading, setAppointmentsLoading] = useState(false);
 
   useEffect(() => {
     if (!businessId) return;
@@ -32,6 +35,28 @@ export default function Calls({ businessId }) {
     });
     return () => unsub();
   }, [businessId, statusFilter, sortOrder]);
+
+  useEffect(() => {
+    if (!businessId) return;
+    if (!selectedCall?.from) {
+      setAppointments([]);
+      setAppointmentsLoading(false);
+      return;
+    }
+
+    setAppointmentsLoading(true);
+    const apptRef = collection(db, `businesses/${businessId}/appointments`);
+    const apptQuery = query(
+      apptRef,
+      where('phone', '==', selectedCall.from),
+      orderBy('startTime', 'desc'),
+    );
+    const unsub = onSnapshot(apptQuery, (snapshot) => {
+      setAppointments(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      setAppointmentsLoading(false);
+    });
+    return () => unsub();
+  }, [businessId, selectedCall]);
 
   if (!businessId) {
     return <div>Missing businessId.  Contact your administrator.</div>;
@@ -56,8 +81,24 @@ export default function Calls({ businessId }) {
       {calls.map((call) => {
         const ts = call.startedAt?.toDate?.() || null;
         const dateStr = ts ? ts.toLocaleString() : '';
+        const isSelected = selectedCall?.id === call.id;
         return (
-          <div key={call.id} className="card">
+          <div
+            key={call.id}
+            className="card"
+            onClick={() => setSelectedCall(call)}
+            style={{
+              cursor: 'pointer',
+              border: isSelected ? '2px solid #1a73e8' : undefined,
+            }}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                setSelectedCall(call);
+              }
+            }}
+          >
             <div className="card-header">
               <div>
                 <strong>{call.from || 'Unknown'}</strong>
@@ -69,6 +110,42 @@ export default function Calls({ businessId }) {
           </div>
         );
       })}
+
+      {selectedCall && (
+        <div style={{ marginTop: '2rem' }}>
+          <h3>Appointments for {selectedCall.from || 'Unknown number'}</h3>
+          {!selectedCall.from && (
+            <div>This call does not include a caller phone number.</div>
+          )}
+          {selectedCall.from && appointmentsLoading && <div>Loading appointments...</div>}
+          {selectedCall.from && !appointmentsLoading && appointments.length === 0 && (
+            <div>No appointments found for this number.</div>
+          )}
+          {selectedCall.from &&
+            appointments.map((appt) => {
+              const start = appt.startTime?.toDate?.() || null;
+              const end = appt.endTime?.toDate?.() || null;
+              const timeStr = start ? start.toLocaleString() : appt.startTime;
+              const endStr = end ? end.toLocaleString() : appt.endTime;
+              return (
+                <div key={appt.id} className="card">
+                  <div className="card-header">
+                    <div>
+                      <strong>{appt.service || 'Service'}</strong>
+                      <div style={{ fontSize: '0.8rem', color: '#555' }}>
+                        {timeStr}
+                        {endStr ? ` – ${endStr}` : ''}
+                      </div>
+                    </div>
+                    <span className="badge booked">{appt.status || 'pending'}</span>
+                  </div>
+                  <p style={{ marginTop: '0.5rem' }}>{appt.name || 'Unknown customer'}</p>
+                  {appt.notes && <p style={{ fontSize: '0.8rem', color: '#555' }}>{appt.notes}</p>}
+                </div>
+              );
+            })}
+        </div>
+      )}
     </div>
   );
 }
