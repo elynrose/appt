@@ -328,6 +328,17 @@ wss.on('connection', async (ws, req) => {
     const session = new RealtimeSession(agent, { transport });
     console.log(`[WebSocket] Connecting to OpenAI Realtime API...`);
     await session.connect({ apiKey: process.env.OPENAI_API_KEY });
+    let greeted = false;
+    transport.on('*', (event) => {
+      if (
+        !greeted &&
+        event.type === 'twilio_message' &&
+        event.message?.event === 'start'
+      ) {
+        greeted = true;
+        session.sendMessage('Please greet the caller now.');
+      }
+    });
     console.log(`[WebSocket] ✅ Realtime session started for call ${callSid} (business ${businessId}).`);
   } catch (err) {
     console.error(`[WebSocket] ❌ Realtime session error for call ${callSid}:`, err);
