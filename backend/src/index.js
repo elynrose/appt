@@ -207,6 +207,35 @@ fastify.all('/voice', async (request, reply) => {
     // Ensure we have CallSid and To (should be in body from Twilio)
     const finalCallSid = callSid || `CA${Date.now()}`;
     const finalToNumber = toNumber || request.body?.Called || '';
+
+    // Persist the call record for the business (if Firestore is available)
+    if (db) {
+      try {
+        await db
+          .collection('businesses')
+          .doc(businessId)
+          .collection('calls')
+          .doc(finalCallSid)
+          .set(
+            {
+              callSid: finalCallSid,
+              businessId,
+              from: fromNumber || null,
+              to: finalToNumber || null,
+              status: request.body?.CallStatus || 'ringing',
+              plan,
+              source: 'twilio_voice',
+              startedAt: FieldValue.serverTimestamp(),
+              updatedAt: FieldValue.serverTimestamp(),
+            },
+            { merge: true },
+          );
+      } catch (err) {
+        console.error('[Voice Webhook] Failed to persist call record:', err);
+      }
+    } else {
+      console.warn('[Voice Webhook] Firestore not initialised; skipping call persistence.');
+    }
     
     // Provide a simple greeting.  This could be customised per business.
     const greeting = 'Thank you for calling. Please wait while I connect you to our scheduling assistant.';
