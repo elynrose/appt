@@ -427,16 +427,32 @@ wss.on('connection', async (ws, req) => {
   let streamSid = null;
   let greeted = false;
   let sessionRef = null;
+  const maybeTriggerGreeting = () => {
+    if (!greeted && sessionRef) {
+      greeted = true;
+      // Create a conversation item and force a response without waiting for user audio.
+      sessionRef.transport.sendEvent({
+        type: 'conversation.item.create',
+        item: {
+          type: 'message',
+          role: 'user',
+          content: [{ type: 'input_text', text: 'Please greet the caller now.' }],
+        },
+      });
+      sessionRef.transport.sendEvent({ type: 'response.create' });
+    }
+  };
+
   ws.on('message', (message) => {
     try {
       const data = JSON.parse(message.toString());
       if (data.event === 'start' && data.start?.streamSid) {
         streamSid = data.start.streamSid;
-        if (!greeted && sessionRef) {
-          greeted = true;
-          // Force a response without waiting for user audio.
-          sessionRef.transport.sendEvent({ type: 'response.create' });
-        }
+        maybeTriggerGreeting();
+      } else if (data.event === 'media' && data.streamSid && !streamSid) {
+        // Media messages also include streamSid, use them as a fallback trigger.
+        streamSid = data.streamSid;
+        maybeTriggerGreeting();
       }
     } catch (err) {
       // Ignore non-JSON messages.
