@@ -425,11 +425,17 @@ wss.on('connection', async (ws, req) => {
   });
 
   let streamSid = null;
+  let greeted = false;
+  let sessionRef = null;
   ws.on('message', (message) => {
     try {
       const data = JSON.parse(message.toString());
       if (data.event === 'start' && data.start?.streamSid) {
         streamSid = data.start.streamSid;
+        if (!greeted && sessionRef) {
+          greeted = true;
+          sessionRef.sendMessage('Please greet the caller now.');
+        }
       }
     } catch (err) {
       // Ignore non-JSON messages.
@@ -476,9 +482,9 @@ wss.on('connection', async (ws, req) => {
         },
       },
     });
+    sessionRef = session;
     console.log(`[WebSocket] Connecting to OpenAI Realtime API...`);
     await session.connect({ apiKey: process.env.OPENAI_API_KEY });
-    let greeted = false;
 
     let sawResponseAudio = false;
     if (holdAudioBuffer) {
@@ -504,19 +510,13 @@ wss.on('connection', async (ws, req) => {
         );
       }, 20);
     }
-    transport.on('*', (event) => {
-      if (
-        !greeted &&
-        event.type === 'twilio_message' &&
-        event.message?.event === 'start'
-      ) {
-        // Start hold audio, then greet after a short ring.
+    // If we somehow missed the start event, fall back after a short delay.
+    setTimeout(() => {
+      if (!greeted) {
         greeted = true;
-        setTimeout(() => {
-          session.sendMessage('Please greet the caller now.');
-        }, 1200);
+        session.sendMessage('Please greet the caller now.');
       }
-    });
+    }, 1200);
 
     transport.on('audio', (event) => {
       sawResponseAudio = true;
