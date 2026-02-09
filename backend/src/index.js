@@ -462,7 +462,20 @@ wss.on('connection', async (ws, req) => {
     const transport = new TwilioRealtimeTransportLayer({
       twilioWebSocket: ws,
     });
-    const session = new RealtimeSession(agent, { transport });
+    const session = new RealtimeSession(agent, {
+      transport,
+      config: {
+        audio: {
+          input: {
+            turnDetection: {
+              type: 'semantic_vad',
+              createResponse: false,
+              interruptResponse: false,
+            },
+          },
+        },
+      },
+    });
     console.log(`[WebSocket] Connecting to OpenAI Realtime API...`);
     await session.connect({ apiKey: process.env.OPENAI_API_KEY });
     let greeted = false;
