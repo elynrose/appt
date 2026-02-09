@@ -434,7 +434,8 @@ wss.on('connection', async (ws, req) => {
         streamSid = data.start.streamSid;
         if (!greeted && sessionRef) {
           greeted = true;
-          sessionRef.sendMessage('Please greet the caller now.');
+          // Force a response without waiting for user audio.
+          sessionRef.transport.sendEvent({ type: 'response.create' });
         }
       }
     } catch (err) {
@@ -512,7 +513,13 @@ wss.on('connection', async (ws, req) => {
         );
       }, 20);
     }
-    // The model will respond automatically after idle timeout via server VAD.
+    // Fallback: if start isn't seen quickly, force a response anyway.
+    setTimeout(() => {
+      if (!greeted) {
+        greeted = true;
+        session.transport.sendEvent({ type: 'response.create' });
+      }
+    }, 1200);
 
     transport.on('audio', (event) => {
       sawResponseAudio = true;
