@@ -474,9 +474,11 @@ wss.on('connection', async (ws, req) => {
         audio: {
           input: {
             turnDetection: {
-              type: 'semantic_vad',
-              createResponse: false,
+              type: 'server_vad',
+              createResponse: true,
               interruptResponse: false,
+              idleTimeoutMs: 3000,
+              silenceDurationMs: 200,
             },
           },
         },
@@ -510,13 +512,7 @@ wss.on('connection', async (ws, req) => {
         );
       }, 20);
     }
-    // If we somehow missed the start event, fall back after a short delay.
-    setTimeout(() => {
-      if (!greeted) {
-        greeted = true;
-        session.sendMessage('Please greet the caller now.');
-      }
-    }, 1200);
+    // The model will respond automatically after idle timeout via server VAD.
 
     transport.on('audio', (event) => {
       sawResponseAudio = true;
