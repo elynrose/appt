@@ -271,21 +271,8 @@ fastify.all('/voice', async (request, reply) => {
       console.warn('[Voice Webhook] Firestore not initialised; skipping call persistence.');
     }
     
-    // Provide a greeting before connecting the stream.
-    let businessName = null;
-    if (db) {
-      try {
-        const bizSnap = await db.collection('businesses').doc(businessId).get();
-        if (bizSnap.exists) {
-          const data = bizSnap.data();
-          businessName = data?.name || data?.businessName || null;
-        }
-      } catch (err) {
-        console.error('[Voice Webhook] Failed to load business name for greeting:', err);
-      }
-    }
-    const greetingName = businessName || 'our business';
-    const greeting = `Hello, this is ${greetingName}. How can I help you today? Si hablas español, di "español".`;
+    // Provide a simple greeting.  This could be customised per business.
+    const greeting = 'Thank you for calling. Please wait while I connect you to our scheduling assistant.';
     
     // Get the public URL from environment or use the request host
     // For ngrok, use the public URL; for local dev, use request host
