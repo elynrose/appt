@@ -296,16 +296,54 @@ fastify.all('/voice', async (request, reply) => {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&apos;');
+    const statusCallbackUrl = `${publicUrl}/voice-status?businessId=${encodeURIComponent(
+      businessId,
+    )}&callSid=${encodeURIComponent(finalCallSid)}`;
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n  <Say>${xmlEscape(
       greeting,
     )}</Say>\n  <Connect>\n    <Stream url="${xmlEscape(
       streamUrl,
-    )}" />\n  </Connect>\n</Response>`;
+    )}" statusCallback="${xmlEscape(
+      statusCallbackUrl,
+    )}" statusCallbackEvent="initiated ringing answered completed" />\n  </Connect>\n</Response>`;
     reply.type('text/xml').send(twiml);
   } catch (err) {
     console.error('[Voice Webhook] Error processing webhook:', err);
     const errorTwiml = `<?xml version="1.0" encoding="UTF-8"?>\n<Response>\n  <Say>We're sorry, an error occurred. Please try again later.</Say>\n</Response>`;
     reply.type('text/xml').send(errorTwiml);
+  }
+});
+
+/**
+ * Twilio status callback handler to update call status in Firestore.
+ */
+fastify.all('/voice-status', async (request, reply) => {
+  try {
+    const status = request.body?.CallStatus || request.query?.CallStatus;
+    const callSid = request.body?.CallSid || request.query?.callSid || request.query?.CallSid;
+    const businessId = request.query?.businessId || request.body?.businessId;
+    if (!db || !businessId || !callSid || !status) {
+      reply.code(200).send({ ok: true });
+      return;
+    }
+    const missedStatuses = new Set(['no-answer', 'busy', 'failed', 'canceled']);
+    const finalStatus = missedStatuses.has(status) ? 'missed' : status;
+    await db
+      .collection('businesses')
+      .doc(businessId)
+      .collection('calls')
+      .doc(callSid)
+      .set(
+        {
+          status: finalStatus,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+    reply.code(200).send({ ok: true });
+  } catch (err) {
+    console.error('[Voice Status] Failed to update call status:', err);
+    reply.code(200).send({ ok: true });
   }
 });
 
