@@ -327,7 +327,19 @@ fastify.all('/voice-status', async (request, reply) => {
       return;
     }
     const missedStatuses = new Set(['no-answer', 'busy', 'failed', 'canceled']);
-    const finalStatus = missedStatuses.has(status) ? 'missed' : status;
+    let finalStatus = status;
+    if (missedStatuses.has(status)) {
+      finalStatus = 'missed';
+    } else if (status === 'completed') {
+      const apptSnap = await db
+        .collection('businesses')
+        .doc(businessId)
+        .collection('appointments')
+        .where('callSid', '==', callSid)
+        .limit(1)
+        .get();
+      finalStatus = apptSnap.empty ? 'needs_follow_up' : 'booked';
+    }
     await db
       .collection('businesses')
       .doc(businessId)
